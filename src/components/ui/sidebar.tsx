@@ -134,7 +134,7 @@ function Sidebar({
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent
           side="left"
-          className="w-(--sidebar-width) gap-0 bg-background p-0 text-foreground"
+          className="w-[min(20rem,calc(100vw-2rem))] gap-0 bg-background p-0 text-foreground"
           showCloseButton={false}
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>

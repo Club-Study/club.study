@@ -32,11 +32,6 @@ export function ProfileSummaryCard({
                   <p className="text-sm text-muted-foreground">{userEmail}</p>
                 ) : null}
               </div>
-              {profile.bio ? (
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  {profile.bio}
-                </p>
-              ) : null}
             </div>
             <div className="grid grid-cols-3 gap-2 text-sm">
               <ProfileStat label="Reading" value={activity.readingCount} />
