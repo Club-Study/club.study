@@ -3,11 +3,15 @@ import { ExternalLinkIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { LogReadingSessionDialog } from "@/components/log-reading-session-dialog";
 import { scheduleProgressQueryOptions } from "@/features/schedule/queries";
 import {
   getSchedule,
   getScheduleById,
-  toggleReadStatus,
+  logScheduleReadingSession,
+  setSchedulePaperStatus,
+  updatePaperPageCount,
+  type PaperStatus,
   type ScheduleWithPaper,
 } from "@/features/schedule/api";
 import { PaperReader } from "@/features/annotations/PaperReader";
@@ -17,7 +21,7 @@ import { KatexText } from "@/components/katex-text";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { formatWeekLabel } from "@/lib/dates/week";
+import { formatOptionalDateLabel } from "@/lib/dates/week";
 
 export function ScheduledPaperPage({
   clubId,
@@ -44,18 +48,69 @@ export function ScheduledPaperPage({
   });
   const rowProgress = progress.data?.find((row) => row.schedule_id === scheduleId);
   const hasReadStatus = rowProgress !== undefined;
-  const toggleRead = useMutation({
-    mutationFn: () => {
-      if (!hasReadStatus) {
-        throw new Error("Read status is still loading.");
-      }
-
-      return toggleReadStatus(scheduleId, !rowProgress.current_user_read);
-    },
+  const updateStatus = useMutation({
+    mutationFn: (status: PaperStatus) => setSchedulePaperStatus(scheduleId, status),
     onSuccess: async () => {
       const invalidations = [
         queryClient.invalidateQueries({
           queryKey: queryKeys.schedule.dashboardRoot,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.profile.root,
+        }),
+      ];
+
+      if (effectiveClubId) {
+        invalidations.push(
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.schedule.progress(effectiveClubId),
+          }),
+        );
+      }
+
+      await Promise.all(invalidations);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const updatePageCount = useMutation({
+    mutationFn: ({ paperId, pageCount }: { paperId: string; pageCount: number }) =>
+      updatePaperPageCount(paperId, pageCount),
+    onSuccess: async () => {
+      const invalidations = [
+        queryClient.invalidateQueries({
+          queryKey: clubId
+            ? queryKeys.schedule.detail(clubId, scheduleId)
+            : queryKeys.schedule.detailById(scheduleId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.schedule.dashboardRoot,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.profile.root,
+        }),
+      ];
+
+      if (effectiveClubId) {
+        invalidations.push(
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.schedule.list(effectiveClubId),
+          }),
+        );
+      }
+
+      await Promise.all(invalidations);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const logSession = useMutation({
+    mutationFn: (pages: number) => logScheduleReadingSession(scheduleId, pages),
+    onSuccess: async () => {
+      const invalidations = [
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.schedule.dashboardRoot,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.profile.root,
         }),
       ];
 
@@ -77,6 +132,46 @@ export function ScheduledPaperPage({
   const readProgressLabel = `${rowProgress?.read_count ?? 0}/${
     rowProgress?.total_members ?? 0
   } read`;
+  const pagesRead = rowProgress?.current_user_pages_read ?? 0;
+  const pageProgressLabel = paper
+    ? formatPageProgress(pagesRead, paper.page_count)
+    : "";
+
+  async function saveReadingProgress(values: {
+    currentPage: number;
+    totalPages: number;
+    status: PaperStatus;
+  }) {
+    if (!paper) {
+      throw new Error("Paper is still loading.");
+    }
+
+    if (!hasReadStatus) {
+      throw new Error("Read status is still loading.");
+    }
+
+    if (paper.page_count !== values.totalPages) {
+      await updatePageCount.mutateAsync({
+        paperId: paper.id,
+        pageCount: values.totalPages,
+      });
+    }
+
+    const pagesToLog = values.currentPage - pagesRead;
+    if (pagesToLog > 0) {
+      await logSession.mutateAsync(pagesToLog);
+    }
+
+    const nextStatus = pagesToLog > 0 && values.status !== "read"
+      ? "reading"
+      : values.status;
+
+    if (nextStatus !== rowProgress.current_user_status) {
+      await updateStatus.mutateAsync(nextStatus);
+    }
+
+    toast.success("Reading progress updated");
+  }
 
   if (schedule.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading paper...</p>;
@@ -92,7 +187,7 @@ export function ScheduledPaperPage({
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{paper.source_type}</Badge>
           <span className="text-sm text-muted-foreground">
-            {formatWeekLabel(schedule.data.week_start)}
+            {formatOptionalDateLabel(schedule.data.week_start)}
           </span>
         </div>
         <h2 className="text-2xl font-semibold leading-tight">{paper.title}</h2>
@@ -129,20 +224,22 @@ export function ScheduledPaperPage({
               {showPdf ? "Hide PDF" : "View PDF here"}
             </Button>
           ) : null}
-          <Button
-            type="button"
-            size="sm"
-            disabled={toggleRead.isPending || progress.isLoading || !hasReadStatus}
-            onClick={() => toggleRead.mutate()}
-          >
-            {hasReadStatus
-              ? rowProgress.current_user_read
-                ? "Mark unread"
-                : "Mark read"
-              : "Loading status"}
-          </Button>
+          <LogReadingSessionDialog
+            currentPagesRead={pagesRead}
+            totalPages={paper.page_count}
+            status={rowProgress?.current_user_status ?? "planned"}
+            disabled={
+              logSession.isPending ||
+              updatePageCount.isPending ||
+              updateStatus.isPending ||
+              progress.isLoading ||
+              !hasReadStatus
+            }
+            onSave={saveReadingProgress}
+          />
           <span className="self-center text-sm text-muted-foreground">
             {readProgressLabel}
+            {pageProgressLabel ? ` · ${pageProgressLabel}` : ""}
           </span>
         </div>
       </div>
@@ -203,6 +300,18 @@ function getEmbeddedPdfUrl(paper: {
 function isProbablyPdfUrl(url: string) {
   const lowerUrl = url.toLowerCase();
   return lowerUrl.endsWith(".pdf") || lowerUrl.includes(".pdf?");
+}
+
+function formatPageProgress(pagesRead: number, totalPages: number | null) {
+  if (pagesRead === 0 && totalPages === null) {
+    return "";
+  }
+
+  if (totalPages === null) {
+    return `${pagesRead} pages`;
+  }
+
+  return `${pagesRead} of ${totalPages} pages`;
 }
 
 function getBrowserPaperUrl(paper: {

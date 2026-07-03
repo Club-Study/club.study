@@ -85,10 +85,7 @@ export function ProfilePage() {
       <div className="grid min-w-0 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <ProfileSidebar profile={profile.data} overview={overview.data} />
         <div className="min-w-0 space-y-6">
-          <RecentReadsCard
-            logs={overview.data.readingLogs}
-            readCount={activity.readCount}
-          />
+          <RecentReadsCard overview={overview.data} />
         </div>
       </div>
     </section>

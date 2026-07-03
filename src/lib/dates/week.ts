@@ -32,10 +32,10 @@ export function isMondayDateString(value: string) {
   return !Number.isNaN(date.getTime()) && date.getUTCDay() === 1;
 }
 
-export function formatWeekLabel(value: string) {
+export function formatDateLabel(value: string) {
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) {
-    return value;
+    throw new Error(`Invalid date "${value}".`);
   }
 
   return new Intl.DateTimeFormat("en", {
@@ -44,4 +44,19 @@ export function formatWeekLabel(value: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(date);
+}
+
+export function formatWeekLabel(value: string) {
+  return formatDateLabel(value);
+}
+
+export function formatOptionalDateLabel(
+  value: string | null,
+  emptyLabel = "No deadline",
+) {
+  if (value === null) {
+    return emptyLabel;
+  }
+
+  return formatDateLabel(value);
 }

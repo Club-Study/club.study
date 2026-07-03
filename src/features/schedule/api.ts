@@ -1,5 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 
+export type PaperStatus = "planned" | "reading" | "on_hold" | "dropped" | "read";
+
 export type Paper = {
   id: string;
   source_type: "arxiv" | "manual";
@@ -12,6 +14,7 @@ export type Paper = {
   abstract_url: string | null;
   pdf_url: string | null;
   external_url: string | null;
+  page_count: number | null;
   published_at: string | null;
   source_updated_at: string | null;
   created_at: string;
@@ -22,7 +25,7 @@ export type Schedule = {
   id: string;
   club_id: string;
   paper_id: string;
-  week_start: string;
+  week_start: string | null;
   notes: string | null;
   created_by: string;
   created_at: string;
@@ -48,6 +51,9 @@ export type ScheduleProgress = {
   total_members: number;
   read_count: number;
   current_user_read: boolean;
+  current_user_status: PaperStatus;
+  current_user_pages_read: number;
+  current_user_session_count: number;
 };
 
 export type ArxivMetadata = {
@@ -98,7 +104,7 @@ export async function lookupArxivMetadata(input: string) {
 
 export async function scheduleArxivPaper(values: {
   clubId: string;
-  weekStart: string;
+  deadline: string | null;
   metadata: ArxivMetadata;
 }) {
   return apiRequest<ScheduleWithPaper>(
@@ -106,7 +112,7 @@ export async function scheduleArxivPaper(values: {
     {
       method: "POST",
       body: {
-        week_start: values.weekStart,
+        week_start: values.deadline,
         metadata: values.metadata,
         notes: null,
       },
@@ -116,7 +122,7 @@ export async function scheduleArxivPaper(values: {
 
 export async function scheduleManualPaper(values: {
   clubId: string;
-  weekStart: string;
+  deadline: string | null;
   metadata: {
     title: string;
     authors: string[];
@@ -131,8 +137,26 @@ export async function scheduleManualPaper(values: {
     {
       method: "POST",
       body: {
-        week_start: values.weekStart,
+        week_start: values.deadline,
         metadata: values.metadata,
+        notes: null,
+      },
+    },
+  );
+}
+
+export async function scheduleExistingPaper(values: {
+  clubId: string;
+  deadline: string | null;
+  paperId: string;
+}) {
+  return apiRequest<ScheduleWithPaper>(
+    `api/clubs/${values.clubId}/schedule/existing/`,
+    {
+      method: "POST",
+      body: {
+        week_start: values.deadline,
+        paper_id: values.paperId,
         notes: null,
       },
     },
@@ -147,5 +171,43 @@ export async function toggleReadStatus(scheduleId: string, read: boolean) {
   }>(`api/schedule/${scheduleId}/read-status/`, {
     method: "POST",
     body: { read },
+  });
+}
+
+export async function setSchedulePaperStatus(
+  scheduleId: string,
+  status: PaperStatus,
+) {
+  return apiRequest<{
+    schedule_id: string;
+    status: PaperStatus;
+    read: boolean;
+    reading_log_id: string | null;
+  }>(`api/schedule/${scheduleId}/status/`, {
+    method: "POST",
+    body: { status },
+  });
+}
+
+export async function updatePaperPageCount(paperId: string, pageCount: number) {
+  return apiRequest<Paper>(`api/papers/${paperId}/page-count/`, {
+    method: "PATCH",
+    body: { page_count: pageCount },
+  });
+}
+
+export async function logScheduleReadingSession(
+  scheduleId: string,
+  pagesRead: number,
+) {
+  return apiRequest<{
+    id: string;
+    schedule_id: string;
+    personal_paper_id: null;
+    pages_read: number;
+    logged_at: string;
+  }>(`api/schedule/${scheduleId}/reading-sessions/`, {
+    method: "POST",
+    body: { pages_read: pagesRead },
   });
 }
