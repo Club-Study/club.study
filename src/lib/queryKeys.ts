@@ -6,6 +6,7 @@ export const queryKeys = {
   },
   profile: {
     current: (userId: string) => ["profile", userId] as const,
+    overview: (userId: string) => ["profile", userId, "overview"] as const,
   },
   clubs: {
     all: ["clubs"] as const,
