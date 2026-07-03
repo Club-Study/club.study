@@ -14,7 +14,6 @@ import { commentsQueryOptions } from "@/features/comments/queries";
 import { useCurrentUser } from "@/features/auth/queries";
 import { membersQueryOptions } from "@/features/clubs/queries";
 import { queryKeys } from "@/lib/queryKeys";
-import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -40,9 +39,8 @@ export function CommentsPanel({
         throw new Error("Sign in required.");
       }
 
-      return createComment(supabase, {
+      return createComment({
         scheduleId,
-        authorId: user.data.id,
         body: body.trim(),
       });
     },
@@ -116,7 +114,7 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
   const update = useMutation({
-    mutationFn: () => updateCommentBody(supabase, comment.id, draft.trim()),
+    mutationFn: () => updateCommentBody(comment.id, draft.trim()),
     onSuccess: async () => {
       setEditing(false);
       await queryClient.invalidateQueries({
@@ -126,7 +124,7 @@ function CommentItem({
     onError: (error) => toast.error(error.message),
   });
   const remove = useMutation({
-    mutationFn: () => softDeleteComment(supabase, comment.id),
+    mutationFn: () => softDeleteComment(comment.id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.comments.list(scheduleId),

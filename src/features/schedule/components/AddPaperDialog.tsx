@@ -11,7 +11,6 @@ import {
 } from "@/features/schedule/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { getCurrentWeekStart, isMondayDateString } from "@/lib/dates/week";
-import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,7 +40,7 @@ export function AddPaperDialog({ clubId }: { clubId: string }) {
   const [manualAbstract, setManualAbstract] = useState("");
 
   const lookup = useMutation({
-    mutationFn: () => lookupArxivMetadata(supabase, arxivInput),
+    mutationFn: () => lookupArxivMetadata(arxivInput),
     onSuccess: setMetadata,
     onError: (error) => toast.error(error.message),
   });
@@ -52,7 +51,7 @@ export function AddPaperDialog({ clubId }: { clubId: string }) {
       }
 
       validateWeek(weekStart);
-      return scheduleArxivPaper(supabase, {
+      return scheduleArxivPaper({
         clubId,
         weekStart,
         metadata,
@@ -64,7 +63,7 @@ export function AddPaperDialog({ clubId }: { clubId: string }) {
   const scheduleManual = useMutation({
     mutationFn: () => {
       validateWeek(weekStart);
-      return scheduleManualPaper(supabase, {
+      return scheduleManualPaper({
         clubId,
         weekStart,
         metadata: {

@@ -2,7 +2,6 @@ import { RouterProvider } from "@tanstack/react-router";
 
 import { AppProviders, queryClient } from "@/app/providers";
 import { router } from "@/app/router";
-import { supabase } from "@/lib/supabase/client";
 
 export function App() {
   return (
@@ -11,7 +10,6 @@ export function App() {
         router={router}
         context={{
           queryClient,
-          supabase,
         }}
       />
     </AppProviders>

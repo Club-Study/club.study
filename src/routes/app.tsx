@@ -6,13 +6,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ensureProfileFromUser } from "@/features/profile/api";
+import { getCurrentUser } from "@/features/auth/api";
 
 export const Route = createFileRoute("/app")({
-  beforeLoad: async ({ context, location }) => {
-    const {
-      data: { user },
-    } = await context.supabase.auth.getUser();
+  beforeLoad: async ({ location }) => {
+    const user = await getCurrentUser();
 
     if (!user) {
       throw redirect({
@@ -20,8 +18,6 @@ export const Route = createFileRoute("/app")({
         search: { redirect: location.href },
       });
     }
-
-    await ensureProfileFromUser(context.supabase, user);
   },
   component: AppRoute,
 });

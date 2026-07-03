@@ -9,7 +9,6 @@ export const router = createRouter({
   defaultPendingMinMs: 150,
   context: {
     queryClient: undefined!,
-    supabase: undefined!,
   },
 });
 

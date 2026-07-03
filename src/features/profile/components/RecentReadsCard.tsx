@@ -1,4 +1,3 @@
-import type { Json } from "@/lib/supabase/database.types";
 import { Link } from "@tanstack/react-router";
 
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +57,7 @@ function ReadingLogRow({ log }: { log: ProfileReadingLog }) {
   );
 }
 
-function PaperAuthors({ authors }: { authors: Json | null }) {
+function PaperAuthors({ authors }: { authors: string[] }) {
   const label = formatAuthors(authors);
 
   if (!label) {
@@ -68,11 +67,7 @@ function PaperAuthors({ authors }: { authors: Json | null }) {
   return <span>{label}</span>;
 }
 
-function formatAuthors(authors: Json | null) {
-  if (!authors) {
-    return null;
-  }
-
+function formatAuthors(authors: string[]) {
   if (!Array.isArray(authors)) {
     throw new Error("Paper authors must be an array.");
   }

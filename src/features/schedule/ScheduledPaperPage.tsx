@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatWeekLabel } from "@/lib/dates/week";
-import { supabase } from "@/lib/supabase/client";
 
 export function ScheduledPaperPage({
   clubId,
@@ -34,8 +33,8 @@ export function ScheduledPaperPage({
       : queryKeys.schedule.detailById(scheduleId),
     queryFn: () =>
       clubId
-        ? getSchedule(supabase, clubId, scheduleId)
-        : getScheduleById(supabase, scheduleId),
+        ? getSchedule(clubId, scheduleId)
+        : getScheduleById(scheduleId),
   });
   const effectiveClubId = clubId ?? schedule.data?.club_id ?? "";
   const progress = useQuery({
@@ -50,7 +49,7 @@ export function ScheduledPaperPage({
         throw new Error("Read status is still loading.");
       }
 
-      return toggleReadStatus(supabase, scheduleId, !rowProgress.current_user_read);
+      return toggleReadStatus(scheduleId, !rowProgress.current_user_read);
     },
     onSuccess: async () => {
       const invalidations = [

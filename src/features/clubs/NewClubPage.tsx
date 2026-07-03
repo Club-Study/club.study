@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { createClub } from "@/features/clubs/api";
 import { clubFormSchema, type ClubFormValues } from "@/features/clubs/schemas";
 import { queryKeys } from "@/lib/queryKeys";
-import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +24,7 @@ export function NewClubPage() {
   });
   const create = useMutation({
     mutationFn: (values: ClubFormValues) =>
-      createClub(supabase, {
+      createClub({
         name: values.name,
         description: values.description?.trim() || null,
       }),

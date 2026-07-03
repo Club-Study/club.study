@@ -12,18 +12,17 @@ import {
   profileOverviewQueryOptions,
   profileQueryOptions,
 } from "@/features/profile/queries";
-import { supabase } from "@/lib/supabase/client";
 
 export function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const user = useCurrentUser();
   const userId = user.data?.id;
   const profile = useQuery({
-    ...profileQueryOptions(supabase, userId ?? ""),
+    ...profileQueryOptions(userId ?? ""),
     enabled: Boolean(userId),
   });
   const overview = useQuery({
-    ...profileOverviewQueryOptions(supabase, userId ?? ""),
+    ...profileOverviewQueryOptions(userId ?? ""),
     enabled: Boolean(userId),
   });
   const activity = useMemo(() => {

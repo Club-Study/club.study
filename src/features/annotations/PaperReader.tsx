@@ -42,7 +42,6 @@ import {
 import { useCurrentUser } from "@/features/auth/queries";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase/client";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -118,10 +117,9 @@ export function PaperReader({
         throw new Error("Select text or an area first.");
       }
 
-      return createPaperAnnotation(supabase, {
+      return createPaperAnnotation({
         scheduleId,
         paperId,
-        authorId: user.data.id,
         kind: pendingKind,
         pageNumber: pending.pageNumber,
         position: pending.position,
@@ -743,9 +741,8 @@ function AnnotationReplyForm({
         throw new Error("Sign in required.");
       }
 
-      return createAnnotationReply(supabase, {
+      return createAnnotationReply({
         annotationId,
-        authorId: currentUserId,
         body: body.trim(),
       });
     },

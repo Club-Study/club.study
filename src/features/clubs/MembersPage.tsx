@@ -10,8 +10,8 @@ import {
   invitesQueryOptions,
   membersQueryOptions,
 } from "@/features/clubs/queries";
+import { buildAppUrl } from "@/lib/appUrl";
 import { queryKeys } from "@/lib/queryKeys";
-import { supabase } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,7 @@ export function MembersPage({ clubId }: { clubId: string }) {
   );
   const isOwner = currentMembership?.role === "owner";
   const createInvite = useMutation({
-    mutationFn: () => createInviteLink(supabase, clubId),
+    mutationFn: () => createInviteLink(clubId),
     onSuccess: async (invite) => {
       const inviteUrl = buildInviteUrl(invite.token);
       setLastInviteUrl(inviteUrl);
@@ -54,7 +54,7 @@ export function MembersPage({ clubId }: { clubId: string }) {
     onError: (error) => toast.error(error.message),
   });
   const revokeInvite = useMutation({
-    mutationFn: (inviteId: string) => revokeInviteLink(supabase, inviteId),
+    mutationFn: (inviteId: string) => revokeInviteLink(inviteId),
     onSuccess: async () => {
       setLastInviteUrl(null);
       await queryClient.invalidateQueries({
@@ -183,7 +183,7 @@ export function MembersPage({ clubId }: { clubId: string }) {
 }
 
 function buildInviteUrl(token: string) {
-  return `${window.location.origin}/invites/${token}`;
+  return buildAppUrl(`/invites/${token}`);
 }
 
 async function copyToClipboard(value: string) {
