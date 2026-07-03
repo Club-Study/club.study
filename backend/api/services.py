@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count
+from django.db.models import Count, F, Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.text import slugify
@@ -18,9 +18,14 @@ from rest_framework.exceptions import (
 from annotations.models import PaperAnnotation, PaperAnnotationReply
 from clubs.models import Club, ClubInvite, ClubMember
 from comments.models import Comment
-from papers.models import Paper
+from papers.models import Paper, PersonalPaper
 from profiles.models import Profile
-from schedule.models import ClubPaperSchedule, ReadingLog
+from schedule.models import (
+    ClubPaperSchedule,
+    ReadingLog,
+    ReadingSession,
+    SchedulePaperStatus,
+)
 
 
 def current_profile(user):
@@ -216,7 +221,7 @@ def list_club_schedule(profile, club_id):
     return (
         ClubPaperSchedule.objects.select_related("paper", "created_by")
         .filter(club_id=club_id)
-        .order_by("-week_start")
+        .order_by(F("week_start").desc(nulls_last=True), "-created_at")
     )
 
 
@@ -224,38 +229,78 @@ def list_dashboard_schedule(profile, from_week_start):
     week_start = parse_date_value(from_week_start, "from_week_start")
     return (
         ClubPaperSchedule.objects.select_related("club", "paper", "created_by")
-        .filter(club__memberships__user=profile, week_start__gte=week_start)
-        .order_by("week_start")[:20]
+        .filter(
+            Q(week_start__gte=week_start) | Q(week_start__isnull=True),
+            club__memberships__user=profile,
+        )
+        .order_by(F("week_start").asc(nulls_last=True), "-created_at")[:20]
     )
 
 
 def get_club_progress(profile, club_id):
     ensure_member(profile, club_id)
-    schedules = ClubPaperSchedule.objects.filter(club_id=club_id).order_by("-week_start")
+    schedules = ClubPaperSchedule.objects.filter(club_id=club_id).order_by(
+        F("week_start").desc(nulls_last=True),
+        "-created_at",
+    )
     total_members = ClubMember.objects.filter(club_id=club_id).count()
     read_counts = {
         str(row["schedule_id"]): row["count"]
-        for row in ReadingLog.objects.filter(schedule__club_id=club_id)
+        for row in SchedulePaperStatus.objects.filter(
+            schedule__club_id=club_id,
+            status=SchedulePaperStatus.Status.READ,
+        )
         .values("schedule_id")
         .annotate(count=Count("id"))
     }
-    current_reads = {
-        str(schedule_id)
-        for schedule_id in ReadingLog.objects.filter(
+    current_statuses = {
+        str(row["schedule_id"]): row["status"]
+        for row in SchedulePaperStatus.objects.filter(
             schedule__club_id=club_id,
             user=profile,
-        ).values_list("schedule_id", flat=True)
+        ).values("schedule_id", "status")
+    }
+    current_sessions = {
+        str(row["schedule_id"]): {
+            "pages_read": row["pages_read"] or 0,
+            "session_count": row["session_count"],
+        }
+        for row in ReadingSession.objects.filter(
+            schedule__club_id=club_id,
+            user=profile,
+        )
+        .values("schedule_id")
+        .annotate(
+            pages_read=Sum("pages_read"),
+            session_count=Count("id"),
+        )
     }
 
-    return [
-        {
-            "schedule_id": str(schedule.id),
-            "total_members": total_members,
-            "read_count": read_counts.get(str(schedule.id), 0),
-            "current_user_read": str(schedule.id) in current_reads,
-        }
-        for schedule in schedules
-    ]
+    progress = []
+    for schedule in schedules:
+        status = current_statuses.get(
+            str(schedule.id),
+            SchedulePaperStatus.Status.PLANNED,
+        )
+        progress.append(
+            {
+                "schedule_id": str(schedule.id),
+                "total_members": total_members,
+                "read_count": read_counts.get(str(schedule.id), 0),
+                "current_user_read": status == SchedulePaperStatus.Status.READ,
+                "current_user_status": status,
+                "current_user_pages_read": current_sessions.get(str(schedule.id), {}).get(
+                    "pages_read",
+                    0,
+                ),
+                "current_user_session_count": current_sessions.get(str(schedule.id), {}).get(
+                    "session_count",
+                    0,
+                ),
+            }
+        )
+
+    return progress
 
 
 def schedule_arxiv_paper(profile, club_id, week_start, metadata, notes=None):
@@ -268,6 +313,118 @@ def schedule_manual_paper(profile, club_id, week_start, metadata, notes=None):
     ensure_member(profile, club_id)
     paper = create_manual_paper(metadata)
     return create_schedule(profile, club_id, paper, week_start, notes)
+
+
+def schedule_existing_paper(profile, club_id, paper_id, week_start, notes=None):
+    ensure_member(profile, club_id)
+    paper = get_visible_paper(profile, paper_id)
+    return create_schedule(profile, club_id, paper, week_start, notes)
+
+
+def add_personal_arxiv_paper(profile, metadata, deadline=None):
+    paper = upsert_arxiv_paper(metadata)
+    parsed_deadline = nullable_date_value(deadline, "deadline")
+    personal_paper, created = PersonalPaper.objects.get_or_create(
+        user=profile,
+        paper=paper,
+        defaults={"deadline": parsed_deadline},
+    )
+    if not created and parsed_deadline is not None:
+        personal_paper.deadline = parsed_deadline
+        personal_paper = clean_and_save(personal_paper)
+
+    return personal_paper
+
+
+def add_personal_manual_paper(profile, metadata, deadline=None):
+    paper = create_manual_paper(metadata)
+    personal_paper = PersonalPaper(
+        user=profile,
+        paper=paper,
+        deadline=nullable_date_value(deadline, "deadline"),
+    )
+    return clean_and_save(personal_paper)
+
+
+def get_visible_paper(profile, paper_id):
+    try:
+        paper = Paper.objects.get(id=paper_id)
+    except (Paper.DoesNotExist, DjangoValidationError) as error:
+        raise NotFound("Paper not found.") from error
+
+    if PersonalPaper.objects.filter(user=profile, paper=paper).exists():
+        return paper
+
+    if ClubPaperSchedule.objects.filter(
+        paper=paper,
+        club__memberships__user=profile,
+    ).exists():
+        return paper
+
+    raise PermissionDenied("Paper is not in your profile lists.")
+
+
+def update_paper_page_count(profile, paper_id, page_count):
+    paper = get_visible_paper(profile, paper_id)
+    paper.page_count = positive_int_value(page_count, "page_count")
+    return clean_and_save(paper)
+
+
+def ensure_personal_paper(profile, personal_paper_id):
+    try:
+        return PersonalPaper.objects.select_related("paper").get(
+            id=personal_paper_id,
+            user=profile,
+        )
+    except PersonalPaper.DoesNotExist as error:
+        raise NotFound("Personal paper not found.") from error
+
+
+def schedule_status(profile, schedule):
+    try:
+        return SchedulePaperStatus.objects.get(
+            schedule=schedule,
+            user=profile,
+        ).status
+    except SchedulePaperStatus.DoesNotExist:
+        return SchedulePaperStatus.Status.PLANNED
+
+
+def unread_schedule_status(profile, schedule):
+    if ReadingSession.objects.filter(schedule=schedule, user=profile).exists():
+        return SchedulePaperStatus.Status.READING
+
+    return SchedulePaperStatus.Status.PLANNED
+
+
+def unread_personal_paper_status(profile, personal_paper):
+    if ReadingSession.objects.filter(
+        personal_paper=personal_paper,
+        user=profile,
+    ).exists():
+        return PersonalPaper.Status.READING
+
+    return PersonalPaper.Status.PLANNED
+
+
+def schedule_status_value(value):
+    valid_statuses = {choice[0] for choice in SchedulePaperStatus.Status.choices}
+    if value not in valid_statuses:
+        raise ValidationError(
+            "Status must be one of: {}.".format(", ".join(sorted(valid_statuses)))
+        )
+
+    return value
+
+
+def personal_paper_status_value(value):
+    valid_statuses = {choice[0] for choice in PersonalPaper.Status.choices}
+    if value not in valid_statuses:
+        raise ValidationError(
+            "Status must be one of: {}.".format(", ".join(sorted(valid_statuses)))
+        )
+
+    return value
 
 
 def upsert_arxiv_paper(metadata):
@@ -315,7 +472,7 @@ def create_schedule(profile, club_id, paper, week_start, notes):
     schedule = ClubPaperSchedule(
         club_id=club_id,
         paper=paper,
-        week_start=parse_date_value(week_start, "week_start"),
+        week_start=nullable_date_value(week_start, "week_start"),
         notes=nullable_text(notes),
         created_by=profile,
     )
@@ -323,25 +480,103 @@ def create_schedule(profile, club_id, paper, week_start, notes):
 
 
 def toggle_read_status(profile, schedule_id, read):
-    schedule = ensure_schedule_member(profile, schedule_id)
-
     if read is True:
-        log, _created = ReadingLog.objects.get_or_create(schedule=schedule, user=profile)
-        return {
-            "schedule_id": str(schedule.id),
-            "read": True,
-            "reading_log_id": str(log.id),
-        }
+        return set_schedule_paper_status(
+            profile,
+            schedule_id,
+            SchedulePaperStatus.Status.READ,
+        )
 
     if read is False:
-        ReadingLog.objects.filter(schedule=schedule, user=profile).delete()
-        return {
-            "schedule_id": str(schedule.id),
-            "read": False,
-            "reading_log_id": None,
-        }
+        schedule = ensure_schedule_member(profile, schedule_id)
+        status = unread_schedule_status(profile, schedule)
+        return set_schedule_paper_status(profile, schedule_id, status)
 
     raise ValidationError("Read must be true or false.")
+
+
+def set_schedule_paper_status(profile, schedule_id, status):
+    schedule = ensure_schedule_member(profile, schedule_id)
+    normalized_status = schedule_status_value(status)
+    status_row, _created = SchedulePaperStatus.objects.get_or_create(
+        schedule=schedule,
+        user=profile,
+    )
+    status_row.status = normalized_status
+    status_row = clean_and_save(status_row)
+
+    reading_log_id = None
+    if normalized_status == SchedulePaperStatus.Status.READ:
+        log, _created = ReadingLog.objects.get_or_create(schedule=schedule, user=profile)
+        reading_log_id = str(log.id)
+    else:
+        ReadingLog.objects.filter(schedule=schedule, user=profile).delete()
+
+    return {
+        "schedule_id": str(schedule.id),
+        "status": status_row.status,
+        "read": status_row.status == SchedulePaperStatus.Status.READ,
+        "reading_log_id": reading_log_id,
+    }
+
+
+def toggle_personal_paper_read_status(profile, personal_paper_id, read):
+    if read is True:
+        return set_personal_paper_status(
+            profile,
+            personal_paper_id,
+            PersonalPaper.Status.READ,
+        )
+
+    if read is False:
+        personal_paper = ensure_personal_paper(profile, personal_paper_id)
+        status = unread_personal_paper_status(profile, personal_paper)
+        return set_personal_paper_status(profile, personal_paper_id, status)
+
+    raise ValidationError("Read must be true or false.")
+
+
+def set_personal_paper_status(profile, personal_paper_id, status):
+    personal_paper = ensure_personal_paper(profile, personal_paper_id)
+    personal_paper.status = personal_paper_status_value(status)
+    return clean_and_save(personal_paper)
+
+
+def log_schedule_reading_session(profile, schedule_id, pages_read):
+    schedule = ensure_schedule_member(profile, schedule_id)
+    session = ReadingSession(
+        schedule=schedule,
+        user=profile,
+        pages_read=positive_int_value(pages_read, "pages_read"),
+    )
+    session = clean_and_save(session)
+    if schedule_status(profile, schedule) != SchedulePaperStatus.Status.READ:
+        set_schedule_paper_status(
+            profile,
+            schedule.id,
+            SchedulePaperStatus.Status.READING,
+        )
+
+    return session
+
+
+def log_personal_paper_reading_session(profile, personal_paper_id, pages_read):
+    personal_paper = ensure_personal_paper(profile, personal_paper_id)
+
+    session = ReadingSession(
+        personal_paper=personal_paper,
+        user=profile,
+        pages_read=positive_int_value(pages_read, "pages_read"),
+    )
+    session = clean_and_save(session)
+    if personal_paper.status != PersonalPaper.Status.READ:
+        set_personal_paper_status(
+            profile,
+            personal_paper.id,
+            PersonalPaper.Status.READING,
+        )
+
+    return session
 
 
 def list_profile_overview(profile):
@@ -362,10 +597,34 @@ def list_profile_overview(profile):
     scheduled_papers = (
         ClubPaperSchedule.objects.select_related("club", "paper")
         .filter(club__memberships__user=profile)
-        .order_by("-week_start")
+        .order_by(F("week_start").desc(nulls_last=True), "-created_at")
     )
+    personal_papers = (
+        PersonalPaper.objects.select_related("paper")
+        .filter(user=profile)
+        .order_by("-created_at")
+    )
+    reading_sessions = (
+        ReadingSession.objects.select_related("schedule", "personal_paper")
+        .filter(user=profile)
+        .order_by("-logged_at")
+    )
+    schedule_statuses = {
+        str(row["schedule_id"]): row["status"]
+        for row in SchedulePaperStatus.objects.filter(
+            user=profile,
+            schedule__club__memberships__user=profile,
+        ).values("schedule_id", "status")
+    }
 
-    return memberships, reading_logs, scheduled_papers
+    return (
+        memberships,
+        reading_logs,
+        scheduled_papers,
+        personal_papers,
+        reading_sessions,
+        schedule_statuses,
+    )
 
 
 def list_comments(profile, schedule_id):
@@ -517,6 +776,13 @@ def parse_date_value(value, field_name):
         raise ValidationError("{} must be a valid date.".format(field_name))
 
     return parsed
+
+
+def nullable_date_value(value, field_name):
+    if value is None:
+        return None
+
+    return parse_date_value(value, field_name)
 
 
 def nullable_datetime(value, field_name):

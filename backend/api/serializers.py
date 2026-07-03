@@ -124,6 +124,7 @@ def serialize_paper(paper):
         "abstract_url": paper.abstract_url,
         "pdf_url": paper.pdf_url,
         "external_url": paper.external_url,
+        "page_count": paper.page_count,
         "published_at": iso_datetime(paper.published_at),
         "source_updated_at": iso_datetime(paper.source_updated_at),
         "created_at": iso_datetime(paper.created_at),
@@ -150,19 +151,23 @@ def serialize_schedule(schedule, include_club=False):
     return data
 
 
-def serialize_profile_scheduled_paper(schedule):
+def serialize_profile_scheduled_paper(schedule, status="planned"):
     return {
         "id": str(schedule.id),
         "club_id": str(schedule.club_id),
         "paper_id": str(schedule.paper_id),
         "week_start": iso_date(schedule.week_start),
+        "status": status,
+        "created_at": iso_datetime(schedule.created_at),
         "clubs": serialize_club_summary(schedule.club),
         "papers": {
             "id": str(schedule.paper.id),
+            "abstract_url": schedule.paper.abstract_url,
             "arxiv_id": schedule.paper.arxiv_id,
             "authors": schedule.paper.authors,
             "external_url": schedule.paper.external_url,
             "pdf_url": schedule.paper.pdf_url,
+            "page_count": schedule.paper.page_count,
             "published_at": iso_datetime(schedule.paper.published_at),
             "source_type": schedule.paper.source_type,
             "title": schedule.paper.title,
@@ -175,7 +180,34 @@ def serialize_reading_log(log):
         "id": str(log.id),
         "read_at": iso_datetime(log.read_at),
         "schedule_id": str(log.schedule_id),
-        "club_paper_schedule": serialize_profile_scheduled_paper(log.schedule),
+        "club_paper_schedule": serialize_profile_scheduled_paper(
+            log.schedule,
+            status="read",
+        ),
+    }
+
+
+def serialize_personal_paper(personal_paper):
+    return {
+        "id": str(personal_paper.id),
+        "paper_id": str(personal_paper.paper_id),
+        "read_at": iso_datetime(personal_paper.read_at),
+        "deadline": iso_date(personal_paper.deadline),
+        "status": personal_paper.status,
+        "created_at": iso_datetime(personal_paper.created_at),
+        "papers": serialize_paper(personal_paper.paper),
+    }
+
+
+def serialize_reading_session(session):
+    return {
+        "id": str(session.id),
+        "schedule_id": str(session.schedule_id) if session.schedule_id else None,
+        "personal_paper_id": (
+            str(session.personal_paper_id) if session.personal_paper_id else None
+        ),
+        "pages_read": session.pages_read,
+        "logged_at": iso_datetime(session.logged_at),
     }
 
 

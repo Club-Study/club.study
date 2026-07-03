@@ -15,14 +15,19 @@ from api.serializers import (
     serialize_comment,
     serialize_invite,
     serialize_member,
+    serialize_personal_paper,
+    serialize_paper,
     serialize_profile,
     serialize_profile_scheduled_paper,
     serialize_reading_log,
+    serialize_reading_session,
     serialize_schedule,
     serialize_user,
 )
 from api.services import (
     accept_invite,
+    add_personal_arxiv_paper,
+    add_personal_manual_paper,
     clean_and_save,
     create_annotation,
     create_annotation_reply,
@@ -42,12 +47,19 @@ from api.services import (
     list_members,
     list_profile_overview,
     list_visible_clubs,
+    log_personal_paper_reading_session,
+    log_schedule_reading_session,
     revoke_invite_link,
     schedule_arxiv_paper,
+    schedule_existing_paper,
     schedule_manual_paper,
+    set_personal_paper_status,
+    set_schedule_paper_status,
+    toggle_personal_paper_read_status,
     toggle_read_status,
     update_annotation_body,
     update_comment,
+    update_paper_page_count,
 )
 from profiles.models import Profile
 
@@ -130,7 +142,14 @@ def profile_detail(request):
 @api_view(["GET"])
 def profile_overview(request):
     profile = current_profile(request.user)
-    memberships, reading_logs, scheduled_papers = list_profile_overview(profile)
+    (
+        memberships,
+        reading_logs,
+        scheduled_papers,
+        personal_papers,
+        reading_sessions,
+        schedule_statuses,
+    ) = list_profile_overview(profile)
     return Response(
         {
             "memberships": [
@@ -149,8 +168,19 @@ def profile_overview(request):
             ],
             "readingLogs": [serialize_reading_log(log) for log in reading_logs],
             "scheduledPapers": [
-                serialize_profile_scheduled_paper(schedule)
+                serialize_profile_scheduled_paper(
+                    schedule,
+                    status=schedule_statuses.get(str(schedule.id), "planned"),
+                )
                 for schedule in scheduled_papers
+            ],
+            "personalPapers": [
+                serialize_personal_paper(personal_paper)
+                for personal_paper in personal_papers
+            ],
+            "readingSessions": [
+                serialize_reading_session(session)
+                for session in reading_sessions
             ],
         }
     )
@@ -270,7 +300,7 @@ def schedule_arxiv(request, club_id):
     schedule = schedule_arxiv_paper(
         profile,
         club_id,
-        string_payload(request.data, "week_start"),
+        nullable_string_payload(request.data, "week_start"),
         object_payload(request.data, "metadata"),
         nullable_string_payload(request.data, "notes"),
     )
@@ -283,7 +313,7 @@ def schedule_manual(request, club_id):
     schedule = schedule_manual_paper(
         profile,
         club_id,
-        string_payload(request.data, "week_start"),
+        nullable_string_payload(request.data, "week_start"),
         object_payload(request.data, "metadata"),
         nullable_string_payload(request.data, "notes"),
     )
@@ -291,9 +321,107 @@ def schedule_manual(request, club_id):
 
 
 @api_view(["POST"])
+def schedule_existing(request, club_id):
+    profile = current_profile(request.user)
+    schedule = schedule_existing_paper(
+        profile,
+        club_id,
+        string_payload(request.data, "paper_id"),
+        nullable_string_payload(request.data, "week_start"),
+        nullable_string_payload(request.data, "notes"),
+    )
+    return Response(serialize_schedule(schedule), status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+def personal_arxiv_paper(request):
+    profile = current_profile(request.user)
+    personal_paper = add_personal_arxiv_paper(
+        profile,
+        object_payload(request.data, "metadata"),
+        nullable_string_payload(request.data, "deadline"),
+    )
+    return Response(serialize_personal_paper(personal_paper), status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+def personal_manual_paper(request):
+    profile = current_profile(request.user)
+    personal_paper = add_personal_manual_paper(
+        profile,
+        object_payload(request.data, "metadata"),
+        nullable_string_payload(request.data, "deadline"),
+    )
+    return Response(serialize_personal_paper(personal_paper), status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+def personal_paper_read_status(request, personal_paper_id):
+    profile = current_profile(request.user)
+    personal_paper = toggle_personal_paper_read_status(
+        profile,
+        personal_paper_id,
+        request.data.get("read"),
+    )
+    return Response(serialize_personal_paper(personal_paper))
+
+
+@api_view(["POST"])
+def personal_paper_status(request, personal_paper_id):
+    profile = current_profile(request.user)
+    personal_paper = set_personal_paper_status(
+        profile,
+        personal_paper_id,
+        string_payload(request.data, "status"),
+    )
+    return Response(serialize_personal_paper(personal_paper))
+
+
+@api_view(["PATCH"])
+def paper_page_count(request, paper_id):
+    profile = current_profile(request.user)
+    paper = update_paper_page_count(profile, paper_id, request.data.get("page_count"))
+    return Response(serialize_paper(paper))
+
+
+@api_view(["POST"])
 def read_status(request, schedule_id):
     profile = current_profile(request.user)
     return Response(toggle_read_status(profile, schedule_id, request.data.get("read")))
+
+
+@api_view(["POST"])
+def schedule_status(request, schedule_id):
+    profile = current_profile(request.user)
+    return Response(
+        set_schedule_paper_status(
+            profile,
+            schedule_id,
+            string_payload(request.data, "status"),
+        )
+    )
+
+
+@api_view(["POST"])
+def schedule_reading_session(request, schedule_id):
+    profile = current_profile(request.user)
+    session = log_schedule_reading_session(
+        profile,
+        schedule_id,
+        request.data.get("pages_read"),
+    )
+    return Response(serialize_reading_session(session), status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+def personal_paper_reading_session(request, personal_paper_id):
+    profile = current_profile(request.user)
+    session = log_personal_paper_reading_session(
+        profile,
+        personal_paper_id,
+        request.data.get("pages_read"),
+    )
+    return Response(serialize_reading_session(session), status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET", "POST"])

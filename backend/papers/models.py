@@ -1,8 +1,9 @@
 import uuid
 
 from django.core.exceptions import ValidationError
-from django.core.validators import URLValidator
+from django.core.validators import MinValueValidator, URLValidator
 from django.db import models
+from django.utils import timezone
 
 
 class Paper(models.Model):
@@ -21,6 +22,11 @@ class Paper(models.Model):
     abstract_url = models.TextField(null=True, blank=True, validators=[URLValidator()])
     pdf_url = models.TextField(null=True, blank=True, validators=[URLValidator()])
     external_url = models.TextField(null=True, blank=True, validators=[URLValidator()])
+    page_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+    )
     published_at = models.DateTimeField(null=True, blank=True)
     source_updated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -77,3 +83,58 @@ class Paper(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class PersonalPaper(models.Model):
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Planned"
+        READING = "reading", "Reading"
+        ON_HOLD = "on_hold", "On hold"
+        DROPPED = "dropped", "Dropped"
+        READ = "read", "Read"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "profiles.Profile",
+        on_delete=models.CASCADE,
+        related_name="personal_papers",
+    )
+    paper = models.ForeignKey(
+        Paper,
+        on_delete=models.CASCADE,
+        related_name="personal_saves",
+    )
+    read_at = models.DateTimeField(null=True, blank=True)
+    deadline = models.DateField(null=True, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PLANNED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "personal_papers"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "paper"],
+                name="pers_paper_user_paper_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="pers_paper_user_created_idx"),
+            models.Index(fields=["user", "read_at"], name="pers_paper_user_read_idx"),
+            models.Index(fields=["user", "deadline"], name="pers_paper_user_deadline_idx"),
+            models.Index(fields=["user", "status"], name="pers_paper_user_status_idx"),
+            models.Index(fields=["paper"], name="pers_paper_paper_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.status == self.Status.READ:
+            self.read_at = self.read_at or timezone.now()
+        else:
+            self.read_at = None
+
+    def __str__(self) -> str:
+        return f"{self.user_id} saved {self.paper_id}"

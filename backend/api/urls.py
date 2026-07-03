@@ -36,6 +36,29 @@ urlpatterns = [
         name="schedule-manual",
     ),
     path(
+        "clubs/<uuid:club_id>/schedule/existing/",
+        views.schedule_existing,
+        name="schedule-existing",
+    ),
+    path("papers/personal/arxiv/", views.personal_arxiv_paper, name="personal-arxiv-paper"),
+    path("papers/personal/manual/", views.personal_manual_paper, name="personal-manual-paper"),
+    path("papers/<uuid:paper_id>/page-count/", views.paper_page_count, name="paper-page-count"),
+    path(
+        "personal-papers/<uuid:personal_paper_id>/read-status/",
+        views.personal_paper_read_status,
+        name="personal-paper-read-status",
+    ),
+    path(
+        "personal-papers/<uuid:personal_paper_id>/status/",
+        views.personal_paper_status,
+        name="personal-paper-status",
+    ),
+    path(
+        "personal-papers/<uuid:personal_paper_id>/reading-sessions/",
+        views.personal_paper_reading_session,
+        name="personal-paper-reading-session",
+    ),
+    path(
         "clubs/<uuid:club_id>/schedule/<uuid:schedule_id>/",
         views.club_schedule_detail,
         name="club-schedule-detail",
@@ -45,6 +68,16 @@ urlpatterns = [
         "schedule/<uuid:schedule_id>/read-status/",
         views.read_status,
         name="read-status",
+    ),
+    path(
+        "schedule/<uuid:schedule_id>/status/",
+        views.schedule_status,
+        name="schedule-status",
+    ),
+    path(
+        "schedule/<uuid:schedule_id>/reading-sessions/",
+        views.schedule_reading_session,
+        name="schedule-reading-session",
     ),
     path(
         "schedule/<uuid:schedule_id>/comments/",
