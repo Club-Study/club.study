@@ -1,0 +1,10 @@
+from django.contrib import admin
+
+from papers.models import Paper
+
+
+@admin.register(Paper)
+class PaperAdmin(admin.ModelAdmin):
+    list_display = ("title", "source_type", "arxiv_id", "updated_at")
+    list_filter = ("source_type",)
+    search_fields = ("title", "arxiv_id", "doi")

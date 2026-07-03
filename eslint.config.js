@@ -5,7 +5,14 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src/routeTree.gen.ts"] },
+  {
+    ignores: [
+      "dist",
+      "src/routeTree.gen.ts",
+      "backend/.venv/**",
+      "backend/venv/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
