@@ -13,6 +13,7 @@ import {
 import { PaperReader } from "@/features/annotations/PaperReader";
 import { CommentsPanel } from "@/features/comments/CommentsPanel";
 import { queryKeys } from "@/lib/queryKeys";
+import { KatexText } from "@/components/katex-text";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -149,9 +150,10 @@ export function ScheduledPaperPage({
       {paper.abstract && !showPdf ? (
         <div>
           <h3 className="text-sm font-medium">Abstract</h3>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-            {paper.abstract}
-          </p>
+          <KatexText
+            text={paper.abstract}
+            className="mt-2 text-sm leading-6 text-muted-foreground"
+          />
         </div>
       ) : null}
 

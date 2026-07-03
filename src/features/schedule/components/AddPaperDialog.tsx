@@ -11,6 +11,7 @@ import {
 } from "@/features/schedule/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { getCurrentWeekStart, isMondayDateString } from "@/lib/dates/week";
+import { KatexText } from "@/components/katex-text";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -147,9 +148,10 @@ export function AddPaperDialog({ clubId }: { clubId: string }) {
                     {metadata.authors.join(", ")}
                   </p>
                   {metadata.abstract ? (
-                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                      {metadata.abstract}
-                    </p>
+                    <KatexText
+                      text={metadata.abstract}
+                      className="mt-2 line-clamp-3 text-sm text-muted-foreground"
+                    />
                   ) : null}
                 </div>
               ) : null}

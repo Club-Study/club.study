@@ -16,6 +16,7 @@ import { membersQueryOptions } from "@/features/clubs/queries";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { KatexText } from "@/components/katex-text";
 
 export function CommentsPanel({
   scheduleId,
@@ -213,7 +214,7 @@ function CommentItem({
           onChange={(event) => setDraft(event.target.value)}
         />
       ) : (
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-6">{comment.body}</p>
+        <KatexText text={comment.body} className="mt-3 text-sm leading-6" />
       )}
     </article>
   );
