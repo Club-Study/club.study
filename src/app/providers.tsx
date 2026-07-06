@@ -36,7 +36,7 @@ export function AppProviders({ children }: AppProvidersProps) {
 function AuthStateBridge() {
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.auth.user });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auth.user });
     });
 
     return () => data.subscription.unsubscribe();

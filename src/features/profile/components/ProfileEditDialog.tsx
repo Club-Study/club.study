@@ -24,7 +24,6 @@ import {
   pixelAvatarIds,
 } from "@/lib/pixel-avatars";
 import { queryKeys } from "@/lib/queryKeys";
-import { supabase } from "@/lib/supabase/client";
 
 type ProfileFormValues = Pick<
   Profile,
@@ -64,7 +63,7 @@ export function ProfileEditDialog({
         throw new Error("Display name is required.");
       }
 
-      return updateProfile(supabase, profile.id, {
+      return updateProfile({
         display_name: nextDisplayName,
         avatar_id: values.avatar_id,
         avatar_color: values.avatar_color,

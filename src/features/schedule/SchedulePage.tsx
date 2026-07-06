@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatWeekLabel } from "@/lib/dates/week";
+import { formatOptionalDateLabel } from "@/lib/dates/week";
 
 export function SchedulePage({ clubId }: { clubId: string }) {
   const schedule = useQuery(scheduleListQueryOptions(clubId));
@@ -31,7 +31,7 @@ export function SchedulePage({ clubId }: { clubId: string }) {
         <div>
           <h2 className="text-sm font-medium">Schedule</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            One primary paper per club each week.
+            Papers in this club. Deadlines are optional.
           </p>
         </div>
         <AddPaperDialog clubId={clubId} />
@@ -40,7 +40,7 @@ export function SchedulePage({ clubId }: { clubId: string }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Week</TableHead>
+            <TableHead>Deadline</TableHead>
             <TableHead>Paper</TableHead>
             <TableHead>Progress</TableHead>
             <TableHead className="w-10"></TableHead>
@@ -52,7 +52,7 @@ export function SchedulePage({ clubId }: { clubId: string }) {
             return (
               <TableRow key={row.id}>
                 <TableCell className="text-muted-foreground">
-                  {formatWeekLabel(row.week_start)}
+                  {formatOptionalDateLabel(row.week_start)}
                 </TableCell>
                 <TableCell className="max-w-[420px]">
                   <Link

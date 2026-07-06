@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
+import { KatexText } from "@/components/katex-text";
 import { Badge } from "@/components/ui/badge";
 import type { Profile, ProfileOverview } from "@/features/profile/api";
 
@@ -15,9 +16,10 @@ export function ProfileSidebar({
       <section className="rounded-lg border bg-card p-4">
         <h2 className="text-sm font-medium">Bio</h2>
         {profile.bio ? (
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-            {profile.bio}
-          </p>
+          <KatexText
+            text={profile.bio}
+            className="mt-3 text-sm leading-6 text-muted-foreground"
+          />
         ) : null}
       </section>
 

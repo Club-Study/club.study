@@ -6,7 +6,7 @@ import {
   dashboardScheduleQueryOptions,
   scheduleProgressQueryOptions,
 } from "@/features/schedule/queries";
-import { formatWeekLabel, getCurrentWeekStart } from "@/lib/dates/week";
+import { formatOptionalDateLabel, getCurrentWeekStart } from "@/lib/dates/week";
 
 export function DashboardPage() {
   const clubs = useQuery(clubsQueryOptions);
@@ -55,7 +55,7 @@ export function DashboardPage() {
                     {row.papers?.title ?? "Untitled paper"}
                   </p>
                   <span className="text-xs text-muted-foreground">
-                    {formatWeekLabel(row.week_start)}
+                    {formatOptionalDateLabel(row.week_start)}
                   </span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

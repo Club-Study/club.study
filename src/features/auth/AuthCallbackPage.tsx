@@ -1,7 +1,10 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { clearStoredRedirect, getStoredRedirect } from "@/features/auth/SignInPage";
+import {
+  clearStoredRedirect,
+  getStoredRedirect,
+} from "@/features/auth/SignInPage";
 import { ensureProfileFromUser } from "@/features/profile/api";
 import { supabase } from "@/lib/supabase/client";
 
@@ -30,7 +33,7 @@ export function AuthCallbackPage() {
           throw new Error("No signed-in user was returned.");
         }
 
-        await ensureProfileFromUser(supabase, user);
+        await ensureProfileFromUser(user);
         const redirect =
           typeof search.redirect === "string" && search.redirect.startsWith("/")
             ? search.redirect

@@ -1,10 +1,12 @@
 const scheduleDashboardRoot = ["schedule", "dashboard"] as const;
+const profileRoot = ["profile"] as const;
 
 export const queryKeys = {
   auth: {
     user: ["auth", "user"] as const,
   },
   profile: {
+    root: profileRoot,
     current: (userId: string) => ["profile", userId] as const,
     overview: (userId: string) => ["profile", userId, "overview"] as const,
   },

@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { useCurrentUser } from "@/features/auth/queries";
 import { acceptInvite } from "@/features/clubs/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
 export function InvitePage({ token }: { token: string }) {
@@ -15,7 +14,7 @@ export function InvitePage({ token }: { token: string }) {
   const queryClient = useQueryClient();
   const currentUser = useCurrentUser();
   const accept = useMutation({
-    mutationFn: () => acceptInvite(supabase, token),
+    mutationFn: () => acceptInvite(token),
     onSuccess: async (membership) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.clubs.all });
       toast.success("Joined club");

@@ -80,11 +80,13 @@ test("authenticated launch loop works", async ({ browser, page }) => {
 
   await page.getByRole("link", { name: "Schedule" }).click();
   await mockArxivLookup(page);
-  await page.getByRole("button", { name: "Schedule paper" }).click();
-  await page.getByLabel("arXiv URL or ID").fill("2401.12345");
-  await page.getByRole("button", { name: "Lookup" }).click();
-  await expect(page.getByText("Efficient Reading Clubs")).toBeVisible();
-  await page.getByRole("button", { name: "Schedule" }).click();
+  await page.getByRole("button", { name: "Add paper" }).click();
+  const addPaperDialog = page.getByRole("dialog", { name: "Add paper" });
+  await addPaperDialog.getByRole("button", { name: "arXiv" }).click();
+  await addPaperDialog.getByLabel("arXiv URL or ID").fill("2401.12345");
+  await addPaperDialog.getByRole("button", { name: "Lookup" }).click();
+  await expect(addPaperDialog.getByText("Efficient Reading Clubs")).toBeVisible();
+  await addPaperDialog.getByRole("button", { name: "Add paper" }).click();
 
   const paperLink = page.getByRole("link", {
     name: "Efficient Reading Clubs",
@@ -95,13 +97,17 @@ test("authenticated launch loop works", async ({ browser, page }) => {
   await expect(
     page.getByRole("link", { name: "Open on arXiv" }),
   ).toHaveAttribute("href", "https://arxiv.org/abs/2401.12345");
-  await expect(page.getByRole("link", { name: "Open PDF" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Open in browser" })).toHaveAttribute(
     "href",
     "https://arxiv.org/pdf/2401.12345",
   );
 
-  await page.getByRole("button", { name: "Mark read" }).click();
-  await expect(page.getByRole("button", { name: "Mark unread" })).toBeVisible();
+  await page.getByRole("button", { name: "Log pages" }).click();
+  await page.getByLabel("Current page").fill("10");
+  await page.getByLabel("Total pages").fill("10");
+  await page.getByLabel("Status").selectOption("read");
+  await page.getByRole("button", { name: "Save progress" }).click();
+  await expect(page.getByText("10 of 10 pages")).toBeVisible();
 
   await page.getByPlaceholder("Add a comment").fill("Ready for discussion.");
   await page.getByRole("button", { name: "Comment" }).click();
@@ -138,7 +144,8 @@ async function createSignedInUser(page: Page, prefix: string) {
   const { error: profileError } = await admin.from("profiles").upsert({
     id: user.id,
     display_name: displayName,
-    avatar_url: null,
+    avatar_id: "bookworm",
+    avatar_color: "#65a30d",
     bio: null,
   });
 

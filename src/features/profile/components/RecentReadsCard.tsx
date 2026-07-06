@@ -1,89 +1,77 @@
-import type { Json } from "@/lib/supabase/database.types";
-import { Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import type { ProfileReadingLog } from "@/features/profile/api";
-import { formatWeekLabel } from "@/lib/dates/week";
+import { Button } from "@/components/ui/button";
+import { AddPersonalPaperDialog } from "@/features/profile/components/AddPersonalPaperDialog";
+import { ProfilePaperRows } from "@/features/profile/components/ProfilePaperRows";
+import {
+  getViewCount,
+  paperListViews,
+  type PaperListView,
+} from "@/features/profile/components/profilePaperList";
+import type { ProfileOverview } from "@/features/profile/api";
+import { buildProfilePaperBuckets } from "@/features/profile/profileActivity";
 
 export function RecentReadsCard({
-  logs,
-  readCount,
+  overview,
 }: {
-  logs: ProfileReadingLog[];
-  readCount: number;
+  overview: ProfileOverview;
 }) {
+  const [view, setView] = useState<PaperListView>("reading");
+  const buckets = useMemo(() => buildProfilePaperBuckets(overview), [overview]);
+  const activeView = paperListViews.find((item) => item.id === view);
+
+  if (!activeView) {
+    throw new Error(`Unknown profile paper list view: ${view}`);
+  }
+
   return (
     <section className="rounded-lg border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium">Recent Reads</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Papers marked read across your clubs.
-          </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-medium">Papers</h2>
+            <span className="text-xs text-muted-foreground">
+              {getViewCount(view, buckets)} total
+            </span>
+          </div>
         </div>
-        <Badge variant="outline">{readCount} total</Badge>
+        <div className="flex shrink-0 items-center gap-2">
+          <AddPersonalPaperDialog />
+          <div
+            className="flex items-center gap-0.5 rounded-md border bg-muted/10 p-0.5"
+            role="tablist"
+            aria-label="Profile paper status"
+          >
+            {paperListViews.map(({ id, label, Icon }) => (
+              <Button
+                key={id}
+                type="button"
+                role="tab"
+                aria-label={label}
+                title={label}
+                aria-selected={view === id}
+                aria-controls="profile-paper-panel"
+                id={`profile-paper-tab-${id}`}
+                variant="ghost"
+                size="xs"
+                className="h-6 min-w-0 gap-1 rounded-sm px-1.5 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-xs [&_svg:not([class*='size-'])]:size-3"
+                onClick={() => setView(id)}
+              >
+                <Icon aria-hidden="true" />
+                <span className="hidden sm:inline">{label}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="mt-3 divide-y">
-        {logs.length > 0 ? (
-          logs.slice(0, 8).map((log) => <ReadingLogRow key={log.id} log={log} />)
-        ) : (
-          <p className="py-3 text-sm text-muted-foreground">No papers read yet.</p>
-        )}
+      <div
+        id="profile-paper-panel"
+        role="tabpanel"
+        aria-labelledby={`profile-paper-tab-${view}`}
+        className="mt-3 divide-y"
+      >
+        <ProfilePaperRows view={view} buckets={buckets} empty={activeView.empty} />
       </div>
     </section>
   );
-}
-
-function ReadingLogRow({ log }: { log: ProfileReadingLog }) {
-  const schedule = log.club_paper_schedule;
-
-  return (
-    <Link
-      to="/app/papers/$scheduleId"
-      params={{ scheduleId: schedule.id }}
-      className="block py-3 transition-colors hover:bg-muted/25"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-medium">{schedule.papers.title}</p>
-        <span className="text-xs text-muted-foreground">
-          {new Date(log.read_at).toLocaleDateString()}
-        </span>
-      </div>
-      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{schedule.clubs.name}</span>
-        <span>{formatWeekLabel(schedule.week_start)}</span>
-        <PaperAuthors authors={schedule.papers.authors} />
-      </div>
-    </Link>
-  );
-}
-
-function PaperAuthors({ authors }: { authors: Json | null }) {
-  const label = formatAuthors(authors);
-
-  if (!label) {
-    return null;
-  }
-
-  return <span>{label}</span>;
-}
-
-function formatAuthors(authors: Json | null) {
-  if (!authors) {
-    return null;
-  }
-
-  if (!Array.isArray(authors)) {
-    throw new Error("Paper authors must be an array.");
-  }
-
-  const names = authors.map((author) => {
-    if (typeof author !== "string") {
-      throw new Error("Paper authors must be strings.");
-    }
-
-    return author;
-  });
-
-  return names.slice(0, 3).join(", ");
 }

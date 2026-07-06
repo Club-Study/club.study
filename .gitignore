@@ -18,3 +18,8 @@ test-results
 .agents
 skills-lock.json
 .codex
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+backend/venv/

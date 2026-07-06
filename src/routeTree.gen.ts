@@ -17,6 +17,7 @@ import { Route as InvitesTokenRouteImport } from './routes/invites.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppClubsIndexRouteImport } from './routes/app.clubs.index'
+import { Route as AppPersonalPapersPersonalPaperIdRouteImport } from './routes/app.personal-papers.$personalPaperId'
 import { Route as AppPapersScheduleIdRouteImport } from './routes/app.papers.$scheduleId'
 import { Route as AppClubsNewRouteImport } from './routes/app.clubs.new'
 import { Route as AppClubsClubIdRouteImport } from './routes/app.clubs.$clubId'
@@ -64,6 +65,12 @@ const AppClubsIndexRoute = AppClubsIndexRouteImport.update({
   path: '/clubs/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPersonalPapersPersonalPaperIdRoute =
+  AppPersonalPapersPersonalPaperIdRouteImport.update({
+    id: '/personal-papers/$personalPaperId',
+    path: '/personal-papers/$personalPaperId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppPapersScheduleIdRoute = AppPapersScheduleIdRouteImport.update({
   id: '/papers/$scheduleId',
   path: '/papers/$scheduleId',
@@ -108,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/app/clubs/$clubId': typeof AppClubsClubIdRouteWithChildren
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
+  '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
   '/app/clubs/': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
   '/app/clubs/$clubId/schedule/$scheduleId': typeof AppClubsClubIdScheduleScheduleIdRoute
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
   '/app/clubs/$clubId': typeof AppClubsClubIdRouteWithChildren
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
+  '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
   '/app/clubs': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
   '/app/clubs/$clubId/schedule/$scheduleId': typeof AppClubsClubIdScheduleScheduleIdRoute
@@ -140,6 +149,7 @@ export interface FileRoutesById {
   '/app/clubs/$clubId': typeof AppClubsClubIdRouteWithChildren
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
+  '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
   '/app/clubs/': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
   '/app/clubs/$clubId/schedule/$scheduleId': typeof AppClubsClubIdScheduleScheduleIdRoute
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/app/clubs/$clubId'
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
+    | '/app/personal-papers/$personalPaperId'
     | '/app/clubs/'
     | '/app/clubs/$clubId/members'
     | '/app/clubs/$clubId/schedule/$scheduleId'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/app/clubs/$clubId'
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
+    | '/app/personal-papers/$personalPaperId'
     | '/app/clubs'
     | '/app/clubs/$clubId/members'
     | '/app/clubs/$clubId/schedule/$scheduleId'
@@ -189,6 +201,7 @@ export interface FileRouteTypes {
     | '/app/clubs/$clubId'
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
+    | '/app/personal-papers/$personalPaperId'
     | '/app/clubs/'
     | '/app/clubs/$clubId/members'
     | '/app/clubs/$clubId/schedule/$scheduleId'
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClubsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/personal-papers/$personalPaperId': {
+      id: '/app/personal-papers/$personalPaperId'
+      path: '/personal-papers/$personalPaperId'
+      fullPath: '/app/personal-papers/$personalPaperId'
+      preLoaderRoute: typeof AppPersonalPapersPersonalPaperIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/papers/$scheduleId': {
       id: '/app/papers/$scheduleId'
       path: '/papers/$scheduleId'
@@ -328,6 +348,7 @@ interface AppRouteChildren {
   AppClubsClubIdRoute: typeof AppClubsClubIdRouteWithChildren
   AppClubsNewRoute: typeof AppClubsNewRoute
   AppPapersScheduleIdRoute: typeof AppPapersScheduleIdRoute
+  AppPersonalPapersPersonalPaperIdRoute: typeof AppPersonalPapersPersonalPaperIdRoute
   AppClubsIndexRoute: typeof AppClubsIndexRoute
 }
 
@@ -337,6 +358,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClubsClubIdRoute: AppClubsClubIdRouteWithChildren,
   AppClubsNewRoute: AppClubsNewRoute,
   AppPapersScheduleIdRoute: AppPapersScheduleIdRoute,
+  AppPersonalPapersPersonalPaperIdRoute: AppPersonalPapersPersonalPaperIdRoute,
   AppClubsIndexRoute: AppClubsIndexRoute,
 }
 

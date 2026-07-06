@@ -23,7 +23,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { supabase } from "@/lib/supabase/client";
 
 const navItems = [
   {
@@ -79,7 +78,7 @@ export function AppSidebar() {
             variant="ghost"
             onClick={async () => {
               try {
-                await signOut(supabase);
+                await signOut();
                 queryClient.clear();
                 await navigate({ to: "/sign-in", replace: true });
               } catch (error) {

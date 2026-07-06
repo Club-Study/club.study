@@ -1,11 +1,11 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { generatedClubSlug } from "@/features/clubs/schemas";
+import { supabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type Club = Database["public"]["Tables"]["clubs"]["Row"];
 export type ClubMember = Database["public"]["Tables"]["club_members"]["Row"];
 export type ClubInvite = Database["public"]["Tables"]["club_invites"]["Row"];
+
 export type MemberWithProfile = ClubMember & {
   profiles: {
     id: string;
@@ -16,7 +16,7 @@ export type MemberWithProfile = ClubMember & {
   } | null;
 };
 
-export async function listClubs(supabase: SupabaseClient<Database>) {
+export async function listClubs() {
   const { data, error } = await supabase
     .from("clubs")
     .select("*")
@@ -26,10 +26,14 @@ export async function listClubs(supabase: SupabaseClient<Database>) {
     throw error;
   }
 
+  if (!data) {
+    throw new Error("Clubs query returned no data.");
+  }
+
   return data;
 }
 
-export async function getClub(supabase: SupabaseClient<Database>, clubId: string) {
+export async function getClub(clubId: string) {
   const { data, error } = await supabase
     .from("clubs")
     .select("*")
@@ -43,27 +47,28 @@ export async function getClub(supabase: SupabaseClient<Database>, clubId: string
   return data;
 }
 
-export async function createClub(
-  supabase: SupabaseClient<Database>,
-  values: { name: string; description: string | null },
-) {
+export async function createClub(values: {
+  name: string;
+  description: string | null;
+}) {
   const { data, error } = await supabase.rpc("create_club", {
     p_name: values.name,
     p_slug: generatedClubSlug(values.name),
-    p_description: values.description ?? undefined,
+    p_description: values.description,
   });
 
   if (error) {
     throw error;
   }
 
+  if (!data) {
+    throw new Error("Club was not created.");
+  }
+
   return data;
 }
 
-export async function listMembers(
-  supabase: SupabaseClient<Database>,
-  clubId: string,
-) {
+export async function listMembers(clubId: string) {
   const { data, error } = await supabase
     .from("club_members")
     .select("*, profiles(id, display_name, avatar_id, avatar_color, bio)")
@@ -74,13 +79,14 @@ export async function listMembers(
     throw error;
   }
 
-  return data as MemberWithProfile[];
+  if (!data) {
+    throw new Error("Club members query returned no data.");
+  }
+
+  return data as unknown as MemberWithProfile[];
 }
 
-export async function listInvites(
-  supabase: SupabaseClient<Database>,
-  clubId: string,
-) {
+export async function listInvites(clubId: string) {
   const { data, error } = await supabase
     .from("club_invites")
     .select("*")
@@ -91,13 +97,14 @@ export async function listInvites(
     throw error;
   }
 
+  if (!data) {
+    throw new Error("Club invites query returned no data.");
+  }
+
   return data;
 }
 
-export async function createInviteLink(
-  supabase: SupabaseClient<Database>,
-  clubId: string,
-) {
+export async function createInviteLink(clubId: string) {
   const { data, error } = await supabase.rpc("create_invite_link", {
     p_club_id: clubId,
   });
@@ -106,7 +113,7 @@ export async function createInviteLink(
     throw error;
   }
 
-  const invite = data.at(0);
+  const invite = data?.at(0);
   if (!invite) {
     throw new Error("Invite link was not created.");
   }
@@ -114,10 +121,7 @@ export async function createInviteLink(
   return invite;
 }
 
-export async function revokeInviteLink(
-  supabase: SupabaseClient<Database>,
-  inviteId: string,
-) {
+export async function revokeInviteLink(inviteId: string) {
   const { data, error } = await supabase.rpc("revoke_invite_link", {
     p_invite_id: inviteId,
   });
@@ -126,19 +130,24 @@ export async function revokeInviteLink(
     throw error;
   }
 
+  if (!data) {
+    throw new Error("Invite link was not revoked.");
+  }
+
   return data;
 }
 
-export async function acceptInvite(
-  supabase: SupabaseClient<Database>,
-  token: string,
-) {
+export async function acceptInvite(token: string) {
   const { data, error } = await supabase.rpc("accept_invite", {
     p_token: token,
   });
 
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new Error("Invite was not accepted.");
   }
 
   return data;

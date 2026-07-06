@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
+import { supabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type CommentRow = Database["public"]["Tables"]["comments"]["Row"] & {
@@ -11,13 +10,13 @@ export type CommentRow = Database["public"]["Tables"]["comments"]["Row"] & {
   } | null;
 };
 
-export async function listComments(
-  supabase: SupabaseClient<Database>,
-  scheduleId: string,
-) {
+const commentSelect =
+  "*, profiles(id, display_name, avatar_id, avatar_color)" as const;
+
+export async function listComments(scheduleId: string) {
   const { data, error } = await supabase
     .from("comments")
-    .select("*, profiles(id, display_name, avatar_id, avatar_color)")
+    .select(commentSelect)
     .eq("schedule_id", scheduleId)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
@@ -26,63 +25,75 @@ export async function listComments(
     throw error;
   }
 
-  return data as CommentRow[];
+  if (!data) {
+    throw new Error("Comments query returned no data.");
+  }
+
+  return data as unknown as CommentRow[];
 }
 
-export async function createComment(
-  supabase: SupabaseClient<Database>,
-  values: { scheduleId: string; authorId: string; body: string },
-) {
+export async function createComment(values: { scheduleId: string; body: string }) {
+  const authorId = await requireCurrentUserId();
   const { data, error } = await supabase
     .from("comments")
     .insert({
       schedule_id: values.scheduleId,
-      author_id: values.authorId,
+      author_id: authorId,
       body: values.body,
     })
-    .select()
+    .select(commentSelect)
     .single();
 
   if (error) {
     throw error;
   }
 
-  return data;
+  return data as unknown as CommentRow;
 }
 
-export async function updateCommentBody(
-  supabase: SupabaseClient<Database>,
-  commentId: string,
-  body: string,
-) {
+export async function updateCommentBody(commentId: string, body: string) {
   const { data, error } = await supabase
     .from("comments")
     .update({ body })
     .eq("id", commentId)
-    .select()
+    .select(commentSelect)
     .single();
 
   if (error) {
     throw error;
   }
 
-  return data;
+  return data as unknown as CommentRow;
 }
 
-export async function softDeleteComment(
-  supabase: SupabaseClient<Database>,
-  commentId: string,
-) {
+export async function softDeleteComment(commentId: string) {
   const { data, error } = await supabase
     .from("comments")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", commentId)
-    .select()
+    .select(commentSelect)
     .single();
 
   if (error) {
     throw error;
   }
 
-  return data;
+  return data as unknown as CommentRow;
+}
+
+async function requireCurrentUserId() {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!user) {
+    throw new Error("Sign in required.");
+  }
+
+  return user.id;
 }

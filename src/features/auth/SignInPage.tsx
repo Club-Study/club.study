@@ -4,10 +4,9 @@ import { BookOpenText } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/queries";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase/client";
 
 const redirectStorageKey = "club.study.redirectAfterSignIn";
 
@@ -19,19 +18,14 @@ export function SignInPage() {
   const signIn = useMutation({
     mutationFn: async () => {
       window.localStorage.setItem(redirectStorageKey, redirect);
-      await signInWithGoogle(
-        supabase,
-        `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
-          redirect,
-        )}`,
-      );
+      await signInWithGoogle(`${window.location.origin}/auth/callback`);
     },
     onError: (error) => toast.error(error.message),
   });
 
   useEffect(() => {
     if (currentUser.data) {
-      void navigate({ to: redirect });
+      void navigate({ to: redirect, replace: true });
     }
   }, [currentUser.data, navigate, redirect]);
 

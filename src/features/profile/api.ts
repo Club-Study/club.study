@@ -1,54 +1,84 @@
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 
 import { profileValuesFromUser } from "@/features/auth/api";
-import type { Database } from "@/lib/supabase/database.types";
+import type { ArxivMetadata, Paper, PaperStatus } from "@/features/schedule/api";
+import { supabase } from "@/lib/supabase/client";
+import type { Database, Json } from "@/lib/supabase/database.types";
 
-export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-export type ProfileMembership =
-  Pick<
-    Database["public"]["Tables"]["club_members"]["Row"],
-    "club_id" | "created_at" | "role"
-  > & {
-    clubs: Pick<
-      Database["public"]["Tables"]["clubs"]["Row"],
-      "id" | "name" | "slug" | "description"
-    >;
+type PaperRow = Database["public"]["Tables"]["papers"]["Row"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type PersonalPaperRow = Database["public"]["Tables"]["personal_papers"]["Row"];
+type ReadingSessionRow = Database["public"]["Tables"]["reading_sessions"]["Row"];
+
+export type Profile = ProfileRow;
+
+export type ProfileMembership = {
+  club_id: string;
+  created_at: string;
+  role: "owner" | "member";
+  clubs: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
   };
-export type ProfileScheduledPaper =
-  Pick<
-    Database["public"]["Tables"]["club_paper_schedule"]["Row"],
-    "id" | "club_id" | "paper_id" | "week_start"
-  > & {
-    clubs: Pick<Database["public"]["Tables"]["clubs"]["Row"], "id" | "name" | "slug">;
-    papers: Pick<
-      Database["public"]["Tables"]["papers"]["Row"],
-      | "id"
-      | "arxiv_id"
-      | "authors"
-      | "external_url"
-      | "pdf_url"
-      | "published_at"
-      | "source_type"
-      | "title"
-    >;
+};
+
+export type ProfileScheduledPaper = {
+  id: string;
+  club_id: string;
+  paper_id: string;
+  week_start: string | null;
+  status: PaperStatus;
+  created_at: string;
+  clubs: {
+    id: string;
+    name: string;
+    slug: string;
   };
-export type ProfileReadingLog =
-  Pick<
-    Database["public"]["Tables"]["reading_logs"]["Row"],
-    "id" | "read_at" | "schedule_id"
-  > & {
-    club_paper_schedule: ProfileScheduledPaper;
-  };
+  papers: Pick<
+    Paper,
+    | "id"
+    | "abstract_url"
+    | "arxiv_id"
+    | "authors"
+    | "external_url"
+    | "pdf_url"
+    | "page_count"
+    | "published_at"
+    | "source_type"
+    | "title"
+  >;
+};
+
+export type ProfileReadingLog = {
+  id: string;
+  read_at: string;
+  schedule_id: string;
+  club_paper_schedule: ProfileScheduledPaper;
+};
+
+export type ProfileReadingSession = Pick<
+  ReadingSessionRow,
+  "id" | "schedule_id" | "personal_paper_id" | "pages_read" | "logged_at"
+>;
+
+export type ProfilePersonalPaper = Pick<
+  PersonalPaperRow,
+  "id" | "paper_id" | "read_at" | "deadline" | "status" | "created_at"
+> & {
+  papers: Paper;
+};
+
 export type ProfileOverview = {
   memberships: ProfileMembership[];
   readingLogs: ProfileReadingLog[];
   scheduledPapers: ProfileScheduledPaper[];
+  personalPapers: ProfilePersonalPaper[];
+  readingSessions: ProfileReadingSession[];
 };
 
-export async function upsertProfileFromUser(
-  supabase: SupabaseClient<Database>,
-  user: User,
-) {
+export async function upsertProfileFromUser(user: User) {
   const values = profileValuesFromUser(user);
   const { data, error } = await supabase
     .from("profiles")
@@ -63,10 +93,7 @@ export async function upsertProfileFromUser(
   return data;
 }
 
-export async function ensureProfileFromUser(
-  supabase: SupabaseClient<Database>,
-  user: User,
-) {
+export async function ensureProfileFromUser(user: User) {
   const values = profileValuesFromUser(user);
   const { data, error } = await supabase
     .from("profiles")
@@ -78,31 +105,18 @@ export async function ensureProfileFromUser(
     throw error;
   }
 
-  return data ?? getProfile(supabase, user.id);
+  return data ?? getProfileById(user.id);
 }
 
-export async function getProfile(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+export async function getProfile() {
+  const userId = await requireCurrentUserId();
+  return getProfileById(userId);
 }
 
 export async function updateProfile(
-  supabase: SupabaseClient<Database>,
-  userId: string,
   values: Pick<Profile, "display_name" | "avatar_id" | "avatar_color" | "bio">,
 ) {
+  const userId = await requireCurrentUserId();
   const { data, error } = await supabase
     .from("profiles")
     .upsert({ id: userId, ...values }, { onConflict: "id" })
@@ -116,27 +130,159 @@ export async function updateProfile(
   return data;
 }
 
-export async function getProfileOverview(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-): Promise<ProfileOverview> {
-  const [memberships, readingLogs, scheduledPapers] = await Promise.all([
-    listProfileMemberships(supabase, userId),
-    listProfileReadingLogs(supabase, userId),
-    listVisibleScheduledPapers(supabase),
+export async function getProfileOverview(): Promise<ProfileOverview> {
+  const userId = await requireCurrentUserId();
+  const [
+    memberships,
+    readingLogs,
+    scheduledPapers,
+    personalPapers,
+    readingSessions,
+  ] = await Promise.all([
+    listProfileMemberships(userId),
+    listProfileReadingLogs(userId),
+    listVisibleScheduledPapers(userId),
+    listPersonalPapers(userId),
+    listReadingSessions(userId),
   ]);
 
   return {
     memberships,
     readingLogs,
     scheduledPapers,
+    personalPapers,
+    readingSessions,
   };
 }
 
-async function listProfileMemberships(
-  supabase: SupabaseClient<Database>,
-  userId: string,
+export async function addPersonalArxivPaper(
+  metadata: ArxivMetadata,
+  deadline: string | null,
 ) {
+  const { data, error } = await supabase.rpc("add_personal_arxiv_paper", {
+    p_arxiv_metadata: metadata as unknown as Json,
+    p_deadline: deadline,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Personal arXiv paper was not created.");
+  }
+
+  return getPersonalPaper(data.id);
+}
+
+export async function addPersonalManualPaper(
+  metadata: {
+    title: string;
+    authors: string[];
+    abstract: string | null;
+    doi: string | null;
+    license: string | null;
+    external_url: string;
+  },
+  deadline: string | null,
+) {
+  const { data, error } = await supabase.rpc("add_personal_manual_paper", {
+    p_metadata: metadata as unknown as Json,
+    p_deadline: deadline,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Personal manual paper was not created.");
+  }
+
+  return getPersonalPaper(data.id);
+}
+
+export async function togglePersonalPaperReadStatus(
+  personalPaperId: string,
+  read: boolean,
+) {
+  const { data, error } = await supabase.rpc(
+    "toggle_personal_paper_read_status",
+    {
+      p_personal_paper_id: personalPaperId,
+      p_read: read,
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Personal paper read status was not updated.");
+  }
+
+  return getPersonalPaper(data.id);
+}
+
+export async function setPersonalPaperStatus(
+  personalPaperId: string,
+  status: PaperStatus,
+) {
+  const { data, error } = await supabase.rpc("set_personal_paper_status", {
+    p_personal_paper_id: personalPaperId,
+    p_status: status,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Personal paper status was not updated.");
+  }
+
+  return getPersonalPaper(data.id);
+}
+
+export async function logPersonalPaperReadingSession(
+  personalPaperId: string,
+  pagesRead: number,
+) {
+  const { data, error } = await supabase.rpc(
+    "log_personal_paper_reading_session",
+    {
+      p_personal_paper_id: personalPaperId,
+      p_pages_read: pagesRead,
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Personal paper reading session was not logged.");
+  }
+
+  return data;
+}
+
+async function getProfileById(userId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function listProfileMemberships(userId: string) {
   const { data, error } = await supabase
     .from("club_members")
     .select("club_id, created_at, role, clubs(id, name, slug, description)")
@@ -151,7 +297,7 @@ async function listProfileMemberships(
     throw new Error("Profile memberships query returned no data.");
   }
 
-  const memberships = data as ProfileMembership[];
+  const memberships = data as unknown as ProfileMembership[];
 
   for (const membership of memberships) {
     if (!membership.clubs) {
@@ -162,10 +308,7 @@ async function listProfileMemberships(
   return memberships;
 }
 
-async function listProfileReadingLogs(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-) {
+async function listProfileReadingLogs(userId: string) {
   const { data, error } = await supabase
     .from("reading_logs")
     .select(`
@@ -177,8 +320,9 @@ async function listProfileReadingLogs(
         club_id,
         paper_id,
         week_start,
+        created_at,
         clubs(id, name, slug),
-        papers(id, arxiv_id, authors, external_url, pdf_url, published_at, source_type, title)
+        papers(id, abstract_url, arxiv_id, authors, external_url, pdf_url, page_count, published_at, source_type, title)
       )
     `)
     .eq("user_id", userId)
@@ -192,16 +336,41 @@ async function listProfileReadingLogs(
     throw new Error("Profile reading logs query returned no data.");
   }
 
-  const logs = data as unknown as ProfileReadingLog[];
+  return (data as unknown as ProfileReadingLogRaw[]).map((log) => {
+    const schedule = normalizeProfileScheduledPaper(
+      log.club_paper_schedule,
+      "read",
+      log.schedule_id,
+    );
 
-  for (const log of logs) {
-    assertScheduledPaper(log.club_paper_schedule, log.schedule_id);
-  }
-
-  return logs;
+    return {
+      id: log.id,
+      read_at: log.read_at,
+      schedule_id: log.schedule_id,
+      club_paper_schedule: schedule,
+    };
+  });
 }
 
-async function listVisibleScheduledPapers(supabase: SupabaseClient<Database>) {
+async function listVisibleScheduledPapers(userId: string) {
+  const [schedules, statuses] = await Promise.all([
+    listVisibleScheduledPaperRows(),
+    listScheduleStatuses(userId),
+  ]);
+  const statusByScheduleId = new Map(
+    statuses.map((row) => [row.schedule_id, row.status]),
+  );
+
+  return schedules.map((schedule) =>
+    normalizeProfileScheduledPaper(
+      schedule,
+      statusByScheduleId.get(schedule.id) ?? "planned",
+      schedule.id,
+    ),
+  );
+}
+
+async function listVisibleScheduledPaperRows() {
   const { data, error } = await supabase
     .from("club_paper_schedule")
     .select(`
@@ -209,10 +378,12 @@ async function listVisibleScheduledPapers(supabase: SupabaseClient<Database>) {
       club_id,
       paper_id,
       week_start,
+      created_at,
       clubs(id, name, slug),
-      papers(id, arxiv_id, authors, external_url, pdf_url, published_at, source_type, title)
+      papers(id, abstract_url, arxiv_id, authors, external_url, pdf_url, page_count, published_at, source_type, title)
     `)
-    .order("week_start", { ascending: false });
+    .order("week_start", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     throw error;
@@ -222,28 +393,230 @@ async function listVisibleScheduledPapers(supabase: SupabaseClient<Database>) {
     throw new Error("Profile scheduled papers query returned no data.");
   }
 
-  const scheduledPapers = data as unknown as ProfileScheduledPaper[];
-
-  for (const scheduledPaper of scheduledPapers) {
-    assertScheduledPaper(scheduledPaper, scheduledPaper.id);
-  }
-
-  return scheduledPapers;
+  return data as unknown as ProfileScheduledPaperRaw[];
 }
 
-function assertScheduledPaper(
-  scheduledPaper: ProfileScheduledPaper | null,
+async function listScheduleStatuses(userId: string) {
+  const { data, error } = await supabase
+    .from("schedule_paper_statuses")
+    .select("schedule_id, status")
+    .eq("user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Schedule statuses query returned no data.");
+  }
+
+  return data;
+}
+
+async function listPersonalPapers(userId: string) {
+  const { data, error } = await supabase
+    .from("personal_papers")
+    .select("id, paper_id, read_at, deadline, status, created_at, papers(*)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Personal papers query returned no data.");
+  }
+
+  return (data as unknown as ProfilePersonalPaperRaw[]).map(
+    normalizeProfilePersonalPaper,
+  );
+}
+
+async function listReadingSessions(userId: string) {
+  const { data, error } = await supabase
+    .from("reading_sessions")
+    .select("id, schedule_id, personal_paper_id, pages_read, logged_at")
+    .eq("user_id", userId)
+    .order("logged_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Reading sessions query returned no data.");
+  }
+
+  return data;
+}
+
+async function getPersonalPaper(personalPaperId: string) {
+  const { data, error } = await supabase
+    .from("personal_papers")
+    .select("id, paper_id, read_at, deadline, status, created_at, papers(*)")
+    .eq("id", personalPaperId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeProfilePersonalPaper(data as unknown as ProfilePersonalPaperRaw);
+}
+
+async function requireCurrentUserId() {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!user) {
+    throw new Error("Sign in required.");
+  }
+
+  return user.id;
+}
+
+type ProfilePaperSummary = Pick<
+  Paper,
+  | "id"
+  | "abstract_url"
+  | "arxiv_id"
+  | "authors"
+  | "external_url"
+  | "pdf_url"
+  | "page_count"
+  | "published_at"
+  | "source_type"
+  | "title"
+>;
+
+type ProfileScheduledPaperRaw = Omit<
+  ProfileScheduledPaper,
+  "status" | "papers"
+> & {
+  clubs: ProfileScheduledPaper["clubs"] | null;
+  papers: Pick<
+    PaperRow,
+    | "id"
+    | "abstract_url"
+    | "arxiv_id"
+    | "authors"
+    | "external_url"
+    | "pdf_url"
+    | "page_count"
+    | "published_at"
+    | "source_type"
+    | "title"
+  > | null;
+};
+
+type ProfileReadingLogRaw = Pick<
+  ProfileReadingLog,
+  "id" | "read_at" | "schedule_id"
+> & {
+  club_paper_schedule: ProfileScheduledPaperRaw | null;
+};
+
+type ProfilePersonalPaperRaw = Pick<
+  ProfilePersonalPaper,
+  "id" | "paper_id" | "read_at" | "deadline" | "status" | "created_at"
+> & {
+  papers: PaperRow | null;
+};
+
+function normalizeProfileScheduledPaper(
+  row: ProfileScheduledPaperRaw | null,
+  status: PaperStatus,
   id: string,
-): asserts scheduledPaper is ProfileScheduledPaper {
-  if (!scheduledPaper) {
+): ProfileScheduledPaper {
+  if (!row) {
     throw new Error(`Missing schedule "${id}".`);
   }
 
-  if (!scheduledPaper.clubs) {
-    throw new Error(`Missing club for schedule "${id}".`);
+  if (!row.clubs) {
+    throw new Error(`Missing club for schedule "${row.id}".`);
   }
 
-  if (!scheduledPaper.papers) {
-    throw new Error(`Missing paper for schedule "${id}".`);
+  if (!row.papers) {
+    throw new Error(`Missing paper for schedule "${row.id}".`);
   }
+
+  return {
+    id: row.id,
+    club_id: row.club_id,
+    paper_id: row.paper_id,
+    week_start: row.week_start,
+    status,
+    created_at: row.created_at,
+    clubs: row.clubs,
+    papers: normalizeProfilePaperSummary(row.papers, row.paper_id),
+  };
+}
+
+function normalizeProfilePersonalPaper(
+  row: ProfilePersonalPaperRaw,
+): ProfilePersonalPaper {
+  if (!row.papers) {
+    throw new Error(`Missing paper for personal paper "${row.id}".`);
+  }
+
+  return {
+    id: row.id,
+    paper_id: row.paper_id,
+    read_at: row.read_at,
+    deadline: row.deadline,
+    status: row.status,
+    created_at: row.created_at,
+    papers: normalizePaper(row.papers, row.paper_id),
+  };
+}
+
+function normalizeProfilePaperSummary(
+  row: ProfileScheduledPaperRaw["papers"],
+  id: string,
+): ProfilePaperSummary {
+  if (!row) {
+    throw new Error(`Missing paper "${id}".`);
+  }
+
+  return {
+    id: row.id,
+    abstract_url: row.abstract_url,
+    arxiv_id: row.arxiv_id,
+    authors: stringArray(row.authors, `paper "${row.id}" authors`),
+    external_url: row.external_url,
+    pdf_url: row.pdf_url,
+    page_count: row.page_count,
+    published_at: row.published_at,
+    source_type: row.source_type,
+    title: row.title,
+  };
+}
+
+function normalizePaper(row: PaperRow, id: string): Paper {
+  return {
+    ...row,
+    id: row.id || id,
+    authors: stringArray(row.authors, `paper "${row.id}" authors`),
+  };
+}
+
+function stringArray(value: Json, label: string) {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array.`);
+  }
+
+  return value.map((item) => {
+    if (typeof item !== "string") {
+      throw new Error(`${label} must contain only strings.`);
+    }
+
+    return item;
+  });
 }

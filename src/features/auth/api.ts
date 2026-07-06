@@ -1,20 +1,42 @@
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/supabase/database.types";
+import { supabase } from "@/lib/supabase/client";
 
-export async function getCurrentUser(supabase: SupabaseClient<Database>) {
+export type CurrentUser = {
+  id: string;
+  email: string | undefined;
+};
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (!session) {
+    return null;
+  }
+
   const { data, error } = await supabase.auth.getUser();
   if (error) {
     throw error;
   }
 
-  return data.user;
+  if (!data.user) {
+    return null;
+  }
+
+  return {
+    id: data.user.id,
+    email: data.user.email,
+  };
 }
 
-export async function signInWithGoogle(
-  supabase: SupabaseClient<Database>,
-  redirectTo: string,
-) {
+export async function signInWithGoogle(redirectTo: string) {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -27,7 +49,7 @@ export async function signInWithGoogle(
   }
 }
 
-export async function signOut(supabase: SupabaseClient<Database>) {
+export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) {
     throw error;

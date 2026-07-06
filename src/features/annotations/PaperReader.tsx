@@ -28,12 +28,12 @@ import {
   createAnnotationReply,
   createPaperAnnotation,
   getAnnotationKindColor,
+  listPaperAnnotations,
   type AnnotationKind,
   type AnnotationPosition,
   type AnnotationRect,
   type PaperAnnotationRow,
 } from "@/features/annotations/api";
-import { paperAnnotationsQueryOptions } from "@/features/annotations/queries";
 import {
   getBoundingRect,
   isAnnotationPosition,
@@ -42,7 +42,6 @@ import {
 import { useCurrentUser } from "@/features/auth/queries";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase/client";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -77,12 +76,13 @@ export function PaperReader({
 }: {
   pdfUrl: string;
   browserUrl: string | null;
-  scheduleId: string;
+  scheduleId: string | null;
   paperId: string;
   title: string;
 }) {
   const queryClient = useQueryClient();
   const user = useCurrentUser();
+  const hasAnnotationContext = scheduleId !== null;
   const [discussionVisible, setDiscussionVisible] = useState(false);
   const [areaMode, setAreaMode] = useState(false);
   const [numPages, setNumPages] = useState(0);
@@ -100,10 +100,20 @@ export function PaperReader({
   const zoom = zoomLevels[zoomIndex] ?? 1;
   const pageWidth = Math.max(320, Math.min(920, paneWidth - 24)) * zoom;
   const annotations = useQuery({
-    ...paperAnnotationsQueryOptions(scheduleId, paperId),
-    enabled: discussionVisible,
+    queryKey: hasAnnotationContext
+      ? queryKeys.annotations.list(scheduleId, paperId)
+      : ["annotations", "unavailable", paperId],
+    queryFn: () => {
+      if (scheduleId === null) {
+        throw new Error("Paper annotations require a schedule.");
+      }
+
+      return listPaperAnnotations({ scheduleId, paperId });
+    },
+    enabled: discussionVisible && hasAnnotationContext,
   });
-  const visibleAnnotations = discussionVisible ? annotations.data ?? [] : [];
+  const visibleAnnotations =
+    discussionVisible && hasAnnotationContext ? annotations.data ?? [] : [];
   const selectedAnnotation =
     visibleAnnotations.find((annotation) => annotation.id === selectedAnnotationId) ??
     visibleAnnotations[0] ??
@@ -118,10 +128,13 @@ export function PaperReader({
         throw new Error("Select text or an area first.");
       }
 
-      return createPaperAnnotation(supabase, {
+      if (scheduleId === null) {
+        throw new Error("Paper annotations require a schedule.");
+      }
+
+      return createPaperAnnotation({
         scheduleId,
         paperId,
-        authorId: user.data.id,
         kind: pendingKind,
         pageNumber: pending.pageNumber,
         position: pending.position,
@@ -131,6 +144,10 @@ export function PaperReader({
       });
     },
     onSuccess: async (created) => {
+      if (scheduleId === null) {
+        throw new Error("Paper annotations require a schedule.");
+      }
+
       setPending(null);
       setPendingBody("");
       setPendingKind(defaultKind);
@@ -186,7 +203,7 @@ export function PaperReader({
   }
 
   function handleTextSelection(pageNumber: number) {
-    if (!discussionVisible || areaMode) {
+    if (!discussionVisible || !hasAnnotationContext || areaMode) {
       return;
     }
 
@@ -230,7 +247,12 @@ export function PaperReader({
     pageNumber: number,
     event: PointerEvent<HTMLDivElement>,
   ) {
-    if (!discussionVisible || !areaMode || event.button !== 0) {
+    if (
+      !discussionVisible ||
+      !hasAnnotationContext ||
+      !areaMode ||
+      event.button !== 0
+    ) {
       return;
     }
 
@@ -359,15 +381,17 @@ export function PaperReader({
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={discussionVisible ? "default" : "outline"}
-            onClick={toggleDiscussion}
-          >
-            <PanelRightIcon className="size-4" />
-            {discussionVisible ? "Hide discussion" : "Show discussion"}
-          </Button>
+          {hasAnnotationContext ? (
+            <Button
+              type="button"
+              size="sm"
+              variant={discussionVisible ? "default" : "outline"}
+              onClick={toggleDiscussion}
+            >
+              <PanelRightIcon className="size-4" />
+              {discussionVisible ? "Hide discussion" : "Show discussion"}
+            </Button>
+          ) : null}
           {discussionVisible ? (
             <Button
               type="button"
@@ -468,7 +492,7 @@ export function PaperReader({
                     renderAnnotationLayer
                     loading={<PdfMessage>Loading page...</PdfMessage>}
                   />
-                  {discussionVisible ? (
+                  {discussionVisible && hasAnnotationContext ? (
                     <HighlightLayer
                       annotations={visibleAnnotations}
                       pageNumber={pageNumber}
@@ -485,7 +509,7 @@ export function PaperReader({
           </Document>
         </div>
 
-        {discussionVisible ? (
+        {discussionVisible && hasAnnotationContext ? (
           <AnnotationRail
             annotations={visibleAnnotations}
             selectedAnnotation={selectedAnnotation}
@@ -498,7 +522,7 @@ export function PaperReader({
         ) : null}
       </div>
 
-      {pending ? (
+      {pending && hasAnnotationContext ? (
         <AnnotationComposer
           pending={pending}
           kind={pendingKind}
@@ -743,9 +767,8 @@ function AnnotationReplyForm({
         throw new Error("Sign in required.");
       }
 
-      return createAnnotationReply(supabase, {
+      return createAnnotationReply({
         annotationId,
-        authorId: currentUserId,
         body: body.trim(),
       });
     },
