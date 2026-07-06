@@ -68,6 +68,32 @@ export async function createClub(values: {
   return data;
 }
 
+export async function updateClub(values: {
+  clubId: string;
+  name: string;
+  description: string | null;
+}) {
+  const { data, error } = await supabase
+    .from("clubs")
+    .update({
+      name: values.name,
+      description: values.description,
+    })
+    .eq("id", values.clubId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club was not updated.");
+  }
+
+  return data;
+}
+
 export async function listMembers(clubId: string) {
   const { data, error } = await supabase
     .from("club_members")

@@ -1,10 +1,21 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
-import { clubQueryOptions } from "@/features/clubs/queries";
+import { useCurrentUser } from "@/features/auth/queries";
+import { EditClubDialog } from "@/features/clubs/EditClubDialog";
+import {
+  clubQueryOptions,
+  membersQueryOptions,
+} from "@/features/clubs/queries";
 
 export function ClubShell({ clubId }: { clubId: string }) {
   const club = useQuery(clubQueryOptions(clubId));
+  const currentUser = useCurrentUser();
+  const members = useQuery(membersQueryOptions(clubId));
+  const currentMembership = members.data?.find(
+    (member) => member.user_id === currentUser.data?.id,
+  );
+  const isOwner = currentMembership?.role === "owner";
 
   return (
     <section>
@@ -20,6 +31,7 @@ export function ClubShell({ clubId }: { clubId: string }) {
             </p>
           ) : null}
         </div>
+        {club.data && isOwner ? <EditClubDialog club={club.data} /> : null}
       </div>
       <nav className="mt-6 flex gap-4 border-b text-sm text-muted-foreground">
         <Link
