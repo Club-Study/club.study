@@ -6,11 +6,35 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getCurrentUser } from "@/features/auth/api";
+import { ensureProfileFromUser } from "@/features/profile/api";
+import { supabase } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/app")({
   beforeLoad: async ({ location }) => {
-    const user = await getCurrentUser();
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw sessionError;
+    }
+
+    if (!session) {
+      throw redirect({
+        to: "/sign-in",
+        search: { redirect: location.href },
+      });
+    }
+
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      throw error;
+    }
 
     if (!user) {
       throw redirect({
@@ -18,6 +42,8 @@ export const Route = createFileRoute("/app")({
         search: { redirect: location.href },
       });
     }
+
+    await ensureProfileFromUser(user);
   },
   component: AppRoute,
 });

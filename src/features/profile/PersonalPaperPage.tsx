@@ -96,9 +96,12 @@ export function PersonalPaperPage({
       await logSession.mutateAsync(pagesToLog);
     }
 
-    const nextStatus = pagesToLog > 0 && values.status !== "read"
-      ? "reading"
-      : values.status;
+    const nextStatus =
+      values.currentPage === values.totalPages
+        ? "read"
+        : pagesToLog > 0 && values.status !== "read"
+          ? "reading"
+          : values.status;
 
     if (nextStatus !== personalPaper.status) {
       await updateStatus.mutateAsync(nextStatus);

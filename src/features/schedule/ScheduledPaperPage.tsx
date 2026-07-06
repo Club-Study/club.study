@@ -162,9 +162,12 @@ export function ScheduledPaperPage({
       await logSession.mutateAsync(pagesToLog);
     }
 
-    const nextStatus = pagesToLog > 0 && values.status !== "read"
-      ? "reading"
-      : values.status;
+    const nextStatus =
+      values.currentPage === values.totalPages
+        ? "read"
+        : pagesToLog > 0 && values.status !== "read"
+          ? "reading"
+          : values.status;
 
     if (nextStatus !== rowProgress.current_user_status) {
       await updateStatus.mutateAsync(nextStatus);

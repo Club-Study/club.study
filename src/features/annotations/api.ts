@@ -1,6 +1,8 @@
-import { apiRequest } from "@/lib/api/client";
+import { supabase } from "@/lib/supabase/client";
+import type { Database, Json } from "@/lib/supabase/database.types";
 
-export type AnnotationKind = "highlight" | "question" | "explanation" | "note";
+export type AnnotationKind =
+  Database["public"]["Enums"]["paper_annotation_kind"];
 
 export type AnnotationRect = {
   left: number;
@@ -22,47 +24,47 @@ export type AnnotationProfile = {
   avatar_color: string;
 };
 
-export type AnnotationReplyRow = {
-  id: string;
-  annotation_id: string;
-  author_id: string;
-  body: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-  profiles: AnnotationProfile | null;
-};
+export type AnnotationReplyRow =
+  Database["public"]["Tables"]["paper_annotation_replies"]["Row"] & {
+    profiles: AnnotationProfile | null;
+  };
 
-export type PaperAnnotationRow = {
-  id: string;
-  schedule_id: string;
-  paper_id: string;
-  author_id: string;
-  kind: AnnotationKind;
-  page_number: number;
-  position: unknown;
-  quote: string | null;
-  body: string | null;
-  color: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-  profiles: AnnotationProfile | null;
-  paper_annotation_replies: AnnotationReplyRow[] | null;
-};
+export type PaperAnnotationRow =
+  Database["public"]["Tables"]["paper_annotations"]["Row"] & {
+    profiles: AnnotationProfile | null;
+    paper_annotation_replies: AnnotationReplyRow[] | null;
+  };
+
+const annotationSelect =
+  "*, profiles(id, display_name, avatar_id, avatar_color), paper_annotation_replies(*, profiles(id, display_name, avatar_id, avatar_color))" as const;
+const replySelect =
+  "*, profiles(id, display_name, avatar_id, avatar_color)" as const;
 
 export async function listPaperAnnotations(values: {
   scheduleId: string;
   paperId: string;
 }) {
-  const data = await apiRequest<PaperAnnotationRow[]>(
-    `api/schedule/${values.scheduleId}/annotations/`,
-    {
-      query: { paper_id: values.paperId },
-    },
-  );
+  const { data, error } = await supabase
+    .from("paper_annotations")
+    .select(annotationSelect)
+    .eq("schedule_id", values.scheduleId)
+    .eq("paper_id", values.paperId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+    .order("created_at", {
+      ascending: true,
+      referencedTable: "paper_annotation_replies",
+    });
 
-  return data.map((annotation) => ({
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Paper annotations query returned no data.");
+  }
+
+  return (data as unknown as PaperAnnotationRow[]).map((annotation) => ({
     ...annotation,
     paper_annotation_replies: (
       annotation.paper_annotation_replies ?? []
@@ -80,50 +82,83 @@ export async function createPaperAnnotation(values: {
   body: string | null;
   color: string;
 }) {
-  return apiRequest<PaperAnnotationRow>(
-    `api/schedule/${values.scheduleId}/annotations/`,
-    {
-      method: "POST",
-      body: {
-        paper_id: values.paperId,
-        kind: values.kind,
-        page_number: values.pageNumber,
-        position: values.position,
-        quote: values.quote,
-        body: values.body,
-        color: values.color,
-      },
-    },
-  );
+  const authorId = await requireCurrentUserId();
+  const { data, error } = await supabase
+    .from("paper_annotations")
+    .insert({
+      schedule_id: values.scheduleId,
+      paper_id: values.paperId,
+      author_id: authorId,
+      kind: values.kind,
+      page_number: values.pageNumber,
+      position: values.position as unknown as Json,
+      quote: values.quote,
+      body: values.body,
+      color: values.color,
+    })
+    .select(annotationSelect)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as unknown as PaperAnnotationRow;
 }
 
 export async function createAnnotationReply(values: {
   annotationId: string;
   body: string;
 }) {
-  return apiRequest<AnnotationReplyRow>(
-    `api/annotations/${values.annotationId}/replies/`,
-    {
-      method: "POST",
-      body: { body: values.body },
-    },
-  );
+  const authorId = await requireCurrentUserId();
+  const { data, error } = await supabase
+    .from("paper_annotation_replies")
+    .insert({
+      annotation_id: values.annotationId,
+      author_id: authorId,
+      body: values.body,
+    })
+    .select(replySelect)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as unknown as AnnotationReplyRow;
 }
 
 export async function updatePaperAnnotationBody(
   annotationId: string,
   body: string | null,
 ) {
-  return apiRequest<PaperAnnotationRow>(`api/annotations/${annotationId}/`, {
-    method: "PATCH",
-    body: { body },
-  });
+  const { data, error } = await supabase
+    .from("paper_annotations")
+    .update({ body })
+    .eq("id", annotationId)
+    .select(annotationSelect)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as unknown as PaperAnnotationRow;
 }
 
 export async function softDeletePaperAnnotation(annotationId: string) {
-  return apiRequest<PaperAnnotationRow>(`api/annotations/${annotationId}/`, {
-    method: "DELETE",
-  });
+  const { data, error } = await supabase
+    .from("paper_annotations")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", annotationId)
+    .select(annotationSelect)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as unknown as PaperAnnotationRow;
 }
 
 export function getAnnotationKindColor(kind: AnnotationKind) {
@@ -137,4 +172,21 @@ export function getAnnotationKindColor(kind: AnnotationKind) {
     case "highlight":
       return "#facc15";
   }
+}
+
+async function requireCurrentUserId() {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!user) {
+    throw new Error("Sign in required.");
+  }
+
+  return user.id;
 }

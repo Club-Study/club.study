@@ -6,12 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [
-      "dist",
-      "src/routeTree.gen.ts",
-      "backend/.venv/**",
-      "backend/venv/**",
-    ],
+    ignores: ["dist", "src/routeTree.gen.ts"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

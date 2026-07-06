@@ -258,7 +258,7 @@ select lives_ok(
   'members can schedule an arXiv paper for a Monday'
 );
 
-select throws_like(
+select lives_ok(
   $$ select public.schedule_arxiv_paper(
        (select id from public.clubs where slug = 'rls-club'),
        '2026-07-07'::date,
@@ -271,8 +271,7 @@ select throws_like(
        ),
        null
      ) $$,
-  '%club_paper_schedule_week_start_monday_check%',
-  'schedule week_start must be Monday'
+  'scheduled paper deadlines can be any date'
 );
 
 reset role;
@@ -364,17 +363,18 @@ select lives_ok(
        ),
        null
      ) $$,
-  'replacing a scheduled paper through RPC is allowed for members'
+  'members can schedule another paper with the same deadline'
 );
 
 select is(
   (
-    select created_by
+    select count(*)
     from public.club_paper_schedule
-    where id = '00000000-0000-0000-0000-000000000010'
+    where club_id = (select id from public.clubs where slug = 'rls-club')
+      and week_start = '2026-07-06'::date
   ),
-  '00000000-0000-0000-0000-000000000001'::uuid,
-  'replacing a scheduled paper updates the suggested-by user'
+  2::bigint,
+  'schedules are not unique per club deadline'
 );
 
 reset role;
