@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
   CopyIcon,
   CrownIcon,
   LinkIcon,
+  LogOutIcon,
   MoreHorizontalIcon,
   RotateCcwIcon,
   ShieldCheckIcon,
@@ -16,6 +18,7 @@ import { useCurrentUser } from "@/features/auth/queries";
 import {
   createInviteLink,
   isClubManagerRole,
+  leaveClub,
   revokeInviteLink,
   setClubMemberRole,
   transferClubOwnership,
@@ -56,15 +59,18 @@ import {
 } from "@/components/ui/table";
 
 export function MembersPage({ clubId }: { clubId: string }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const currentUser = useCurrentUser();
   const members = useQuery(membersQueryOptions(clubId));
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
   const currentMembership = members.data?.find(
     (member) => member.user_id === currentUser.data?.id,
   );
   const isOwner = currentMembership?.role === "owner";
   const isManager = isClubManagerRole(currentMembership?.role);
+  const isLastMember = members.data?.length === 1;
   const invites = useQuery({
     ...invitesQueryOptions(clubId),
     enabled: isManager,
@@ -117,6 +123,30 @@ export function MembersPage({ clubId }: { clubId: string }) {
     },
     onError: (error) => toast.error(error.message),
   });
+  const leave = useMutation({
+    mutationFn: () => leaveClub(clubId),
+    onSuccess: async (result) => {
+      setLeaveOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.clubs.all }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.clubs.detail(result.club_id),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.clubs.members(result.club_id),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.profile.root,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.schedule.dashboardRoot,
+        }),
+      ]);
+      toast.success(result.deleted_club ? "Club deleted" : "Club left");
+      await navigate({ to: "/app/clubs" });
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   return (
     <section className="space-y-6">
@@ -127,20 +157,20 @@ export function MembersPage({ clubId }: { clubId: string }) {
             Owners and admins can manage club access.
           </p>
         </div>
-        {isManager ? (
-          <div className="flex gap-2">
-            {pendingInvite ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={revokeInvite.isPending}
-                onClick={() => revokeInvite.mutate(pendingInvite.id)}
-              >
-                <RotateCcwIcon className="size-4" />
-                Revoke invite
-              </Button>
-            ) : null}
+        <div className="flex flex-wrap gap-2">
+          {isManager && pendingInvite ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={revokeInvite.isPending}
+              onClick={() => revokeInvite.mutate(pendingInvite.id)}
+            >
+              <RotateCcwIcon className="size-4" />
+              Revoke invite
+            </Button>
+          ) : null}
+          {isManager ? (
             <Button
               type="button"
               size="sm"
@@ -150,9 +180,55 @@ export function MembersPage({ clubId }: { clubId: string }) {
               <LinkIcon className="size-4" />
               Create invite
             </Button>
-          </div>
-        ) : null}
+          ) : null}
+          {currentMembership ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setLeaveOpen(true)}
+            >
+              <LogOutIcon className="size-4" />
+              Leave club
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      <Dialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isLastMember ? "Delete this club?" : "Leave this club?"}
+            </DialogTitle>
+            <DialogDescription>
+              {isLastMember
+                ? "You are the last member. Leaving will delete the club."
+                : isOwner
+                  ? "Transfer ownership before leaving this club."
+                  : "You will lose access to this club."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLeaveOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant={isLastMember ? "destructive" : "default"}
+              disabled={leave.isPending || (isOwner && !isLastMember)}
+              onClick={() => leave.mutate()}
+            >
+              <LogOutIcon aria-hidden="true" />
+              {isLastMember ? "Delete club" : "Leave"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {isManager && pendingInvite ? (
         <div className="space-y-3 rounded-lg border bg-muted/20 p-3">

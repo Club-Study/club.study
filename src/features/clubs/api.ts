@@ -222,6 +222,24 @@ export async function transferClubOwnership(values: {
   return data;
 }
 
+export async function leaveClub(clubId: string) {
+  const { data, error } = await supabase.rpc("leave_club", {
+    p_club_id: clubId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const result = data?.at(0);
+
+  if (!result) {
+    throw new Error("Club was not left.");
+  }
+
+  return result;
+}
+
 export function isClubManagerRole(role: ClubRole | null | undefined) {
   return role === "owner" || role === "admin";
 }

@@ -472,6 +472,13 @@ export type Database = {
           total_members: number;
         }[];
       };
+      leave_club: {
+        Args: { p_club_id: string };
+        Returns: {
+          club_id: string;
+          deleted_club: boolean;
+        }[];
+      };
       log_personal_paper_reading_session: {
         Args: { p_pages_read: number; p_personal_paper_id: string };
         Returns: Database["public"]["Tables"]["reading_sessions"]["Row"];
