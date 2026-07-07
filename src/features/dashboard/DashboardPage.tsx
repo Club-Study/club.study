@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { clubsQueryOptions } from "@/features/clubs/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import {
   dashboardScheduleQueryOptions,
   scheduleProgressQueryOptions,
@@ -44,23 +45,33 @@ export function DashboardPage() {
         <div className="space-y-1">
           {upcoming.length > 0 ? (
             upcoming.map((row) => (
-              <Link
+              <div
                 key={row.id}
-                to="/app/papers/$scheduleId"
-                params={{ scheduleId: row.id }}
                 className="-mx-2 block rounded-md px-2 py-3 transition-colors hover:bg-muted/35"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium">
+                  <Link
+                    to="/app/papers/$scheduleId"
+                    params={{ scheduleId: row.id }}
+                    className="min-w-0 truncate text-sm font-medium hover:underline"
+                  >
                     {row.papers?.title ?? "Untitled paper"}
-                  </p>
+                  </Link>
                   <span className="text-xs text-muted-foreground">
                     {formatOptionalDateLabel(row.week_start)}
                   </span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span>{row.clubs?.name ?? "Club"}</span>
-                  <span>Suggested by {row.suggested_by?.display_name ?? "Unknown"}</span>
+                  <span>
+                    Suggested by{" "}
+                    <ProfileLink
+                      userId={row.suggested_by?.id}
+                      className="hover:underline"
+                    >
+                      {row.suggested_by?.display_name ?? "Unknown"}
+                    </ProfileLink>
+                  </span>
                   <span>
                     {progressBySchedule.get(row.id)?.current_user_read
                       ? "Read"
@@ -68,7 +79,7 @@ export function DashboardPage() {
                   </span>
                   <span>{formatProgress(progressBySchedule.get(row.id))}</span>
                 </div>
-              </Link>
+              </div>
             ))
           ) : (
             <p className="p-3 text-sm text-muted-foreground">

@@ -30,6 +30,7 @@ type ProfileFormValues = Pick<
   "display_name" | "avatar_id" | "avatar_color"
 > & {
   bio: string;
+  is_private: boolean;
 };
 
 export function ProfileEditDialog({
@@ -49,6 +50,7 @@ export function ProfileEditDialog({
       display_name: profile.display_name,
       avatar_id: profile.avatar_id,
       avatar_color: profile.avatar_color,
+      is_private: !profile.is_public,
       bio: profile.bio ?? "",
     },
   });
@@ -67,10 +69,12 @@ export function ProfileEditDialog({
         display_name: nextDisplayName,
         avatar_id: values.avatar_id,
         avatar_color: values.avatar_color,
+        is_public: !values.is_private,
         bio: values.bio?.trim() || null,
       });
     },
     onSuccess: async (nextProfile) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profile.root });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.profile.current(nextProfile.id),
       });
@@ -174,6 +178,19 @@ export function ProfileEditDialog({
             <Label htmlFor="bio">Bio</Label>
             <Textarea id="bio" rows={4} {...form.register("bio")} />
           </div>
+          <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
+            <Input
+              type="checkbox"
+              className="mt-0.5 size-4"
+              {...form.register("is_private")}
+            />
+            <span className="space-y-1">
+              <span className="block font-medium">Private profile</span>
+              <span className="block text-muted-foreground">
+                Hide your papers and reading activity from other people.
+              </span>
+            </span>
+          </label>
           <DialogFooter>
             <Button type="submit" disabled={update.isPending}>
               <SaveIcon className="size-4" />

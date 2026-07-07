@@ -13,8 +13,10 @@ import { buildProfilePaperBuckets } from "@/features/profile/profileActivity";
 
 export function RecentReadsCard({
   overview,
+  readOnly = false,
 }: {
   overview: ProfileOverview;
+  readOnly?: boolean;
 }) {
   const [view, setView] = useState<PaperListView>("reading");
   const buckets = useMemo(() => buildProfilePaperBuckets(overview), [overview]);
@@ -36,7 +38,7 @@ export function RecentReadsCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <AddPersonalPaperDialog />
+          {readOnly ? null : <AddPersonalPaperDialog />}
           <div
             className="flex items-center gap-0.5 rounded-md border bg-muted/10 p-0.5"
             role="tablist"
@@ -70,7 +72,12 @@ export function RecentReadsCard({
         aria-labelledby={`profile-paper-tab-${view}`}
         className="mt-3 divide-y"
       >
-        <ProfilePaperRows view={view} buckets={buckets} empty={activeView.empty} />
+        <ProfilePaperRows
+          view={view}
+          buckets={buckets}
+          empty={activeView.empty}
+          readOnly={readOnly}
+        />
       </div>
     </section>
   );

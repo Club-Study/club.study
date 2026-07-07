@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { ExternalLinkIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { LogReadingSessionDialog } from "@/components/log-reading-session-dialog";
+import { useCurrentUser } from "@/features/auth/queries";
+import { isClubManagerRole } from "@/features/clubs/api";
+import { membersQueryOptions } from "@/features/clubs/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
+import { SchedulePaperActions } from "@/features/schedule/components/SchedulePaperActions";
 import { scheduleProgressQueryOptions } from "@/features/schedule/queries";
 import {
   getSchedule,
@@ -31,6 +37,8 @@ export function ScheduledPaperPage({
   scheduleId: string;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const currentUser = useCurrentUser();
   const [showPdf, setShowPdf] = useState(false);
   const schedule = useQuery<ScheduleWithPaper>({
     queryKey: clubId
@@ -46,6 +54,14 @@ export function ScheduledPaperPage({
     ...scheduleProgressQueryOptions(effectiveClubId),
     enabled: Boolean(effectiveClubId),
   });
+  const members = useQuery({
+    ...membersQueryOptions(effectiveClubId),
+    enabled: Boolean(effectiveClubId),
+  });
+  const currentMembership = members.data?.find(
+    (member) => member.user_id === currentUser.data?.id,
+  );
+  const isManager = isClubManagerRole(currentMembership?.role);
   const rowProgress = progress.data?.find((row) => row.schedule_id === scheduleId);
   const hasReadStatus = rowProgress !== undefined;
   const updateStatus = useMutation({
@@ -192,13 +208,30 @@ export function ScheduledPaperPage({
           <span className="text-sm text-muted-foreground">
             {formatOptionalDateLabel(schedule.data.week_start)}
           </span>
+          {isManager ? (
+            <SchedulePaperActions
+              schedule={schedule.data}
+              onDeleted={(deletedClubId) => {
+                void navigate({
+                  to: "/app/clubs/$clubId/schedule",
+                  params: { clubId: deletedClubId },
+                });
+              }}
+            />
+          ) : null}
         </div>
         <h2 className="text-2xl font-semibold leading-tight">{paper.title}</h2>
         <p className="text-sm text-muted-foreground">
           {formatAuthors(paper.authors)}
         </p>
         <p className="text-sm text-muted-foreground">
-          Suggested by {schedule.data.suggested_by?.display_name ?? "Unknown"}
+          Suggested by{" "}
+          <ProfileLink
+            userId={schedule.data.suggested_by?.id}
+            className="hover:underline"
+          >
+            {schedule.data.suggested_by?.display_name ?? "Unknown"}
+          </ProfileLink>
         </p>
         <div className="flex flex-wrap gap-2">
           {paper.source_type === "arxiv" && paper.abstract_url ? (

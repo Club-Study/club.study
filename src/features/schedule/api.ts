@@ -230,6 +230,42 @@ export async function scheduleExistingPaper(values: {
   return getSchedule(values.clubId, data.id);
 }
 
+export async function updateScheduledPaperDeadline(values: {
+  scheduleId: string;
+  deadline: string | null;
+}) {
+  const { data, error } = await supabase.rpc("update_scheduled_paper_deadline", {
+    p_schedule_id: values.scheduleId,
+    p_week_start: values.deadline,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Scheduled paper deadline was not updated.");
+  }
+
+  return getSchedule(data.club_id, data.id);
+}
+
+export async function deleteScheduledPaper(scheduleId: string) {
+  const { data, error } = await supabase.rpc("delete_scheduled_paper", {
+    p_schedule_id: scheduleId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Scheduled paper was not deleted.");
+  }
+
+  return data;
+}
+
 export async function toggleReadStatus(scheduleId: string, read: boolean) {
   const { data, error } = await supabase.rpc("toggle_read_status", {
     p_schedule_id: scheduleId,

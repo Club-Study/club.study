@@ -5,6 +5,7 @@ import type { Database } from "@/lib/supabase/database.types";
 export type Club = Database["public"]["Tables"]["clubs"]["Row"];
 export type ClubMember = Database["public"]["Tables"]["club_members"]["Row"];
 export type ClubInvite = Database["public"]["Tables"]["club_invites"]["Row"];
+export type ClubRole = Database["public"]["Enums"]["club_role"];
 
 export type MemberWithProfile = ClubMember & {
   profiles: {
@@ -63,6 +64,32 @@ export async function createClub(values: {
 
   if (!data) {
     throw new Error("Club was not created.");
+  }
+
+  return data;
+}
+
+export async function updateClub(values: {
+  clubId: string;
+  name: string;
+  description: string | null;
+}) {
+  const { data, error } = await supabase
+    .from("clubs")
+    .update({
+      name: values.name,
+      description: values.description,
+    })
+    .eq("id", values.clubId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club was not updated.");
   }
 
   return data;
@@ -151,4 +178,68 @@ export async function acceptInvite(token: string) {
   }
 
   return data;
+}
+
+export async function setClubMemberRole(values: {
+  clubId: string;
+  userId: string;
+  role: Exclude<ClubRole, "owner">;
+}) {
+  const { data, error } = await supabase.rpc("set_club_member_role", {
+    p_club_id: values.clubId,
+    p_user_id: values.userId,
+    p_role: values.role,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club member role was not updated.");
+  }
+
+  return data;
+}
+
+export async function transferClubOwnership(values: {
+  clubId: string;
+  newOwnerId: string;
+}) {
+  const { data, error } = await supabase.rpc("transfer_club_ownership", {
+    p_club_id: values.clubId,
+    p_new_owner_id: values.newOwnerId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club ownership was not transferred.");
+  }
+
+  return data;
+}
+
+export async function leaveClub(clubId: string) {
+  const { data, error } = await supabase.rpc("leave_club", {
+    p_club_id: clubId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const result = data?.at(0);
+
+  if (!result) {
+    throw new Error("Club was not left.");
+  }
+
+  return result;
+}
+
+export function isClubManagerRole(role: ClubRole | null | undefined) {
+  return role === "owner" || role === "admin";
 }
