@@ -21,6 +21,7 @@ import { Route as AppPersonalPapersPersonalPaperIdRouteImport } from './routes/a
 import { Route as AppPapersScheduleIdRouteImport } from './routes/app.papers.$scheduleId'
 import { Route as AppClubsNewRouteImport } from './routes/app.clubs.new'
 import { Route as AppClubsClubIdRouteImport } from './routes/app.clubs.$clubId'
+import { Route as AppClubsClubIdIndexRouteImport } from './routes/app.clubs.$clubId.index'
 import { Route as AppClubsClubIdMembersRouteImport } from './routes/app.clubs.$clubId.members'
 import { Route as AppClubsClubIdScheduleIndexRouteImport } from './routes/app.clubs.$clubId.schedule.index'
 import { Route as AppClubsClubIdScheduleScheduleIdRouteImport } from './routes/app.clubs.$clubId.schedule.$scheduleId'
@@ -86,6 +87,11 @@ const AppClubsClubIdRoute = AppClubsClubIdRouteImport.update({
   path: '/clubs/$clubId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppClubsClubIdIndexRoute = AppClubsClubIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppClubsClubIdRoute,
+} as any)
 const AppClubsClubIdMembersRoute = AppClubsClubIdMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
   '/app/clubs/': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
+  '/app/clubs/$clubId/': typeof AppClubsClubIdIndexRoute
   '/app/clubs/$clubId/schedule/$scheduleId': typeof AppClubsClubIdScheduleScheduleIdRoute
   '/app/clubs/$clubId/schedule/': typeof AppClubsClubIdScheduleIndexRoute
 }
@@ -128,12 +135,12 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/invites/$token': typeof InvitesTokenRoute
   '/app': typeof AppIndexRoute
-  '/app/clubs/$clubId': typeof AppClubsClubIdRouteWithChildren
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
   '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
   '/app/clubs': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
+  '/app/clubs/$clubId': typeof AppClubsClubIdIndexRoute
   '/app/clubs/$clubId/schedule/$scheduleId': typeof AppClubsClubIdScheduleScheduleIdRoute
   '/app/clubs/$clubId/schedule': typeof AppClubsClubIdScheduleIndexRoute
 }
@@ -152,6 +159,7 @@ export interface FileRoutesById {
   '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
   '/app/clubs/': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
+  '/app/clubs/$clubId/': typeof AppClubsClubIdIndexRoute
   '/app/clubs/$clubId/schedule/$scheduleId': typeof AppClubsClubIdScheduleScheduleIdRoute
   '/app/clubs/$clubId/schedule/': typeof AppClubsClubIdScheduleIndexRoute
 }
@@ -171,6 +179,7 @@ export interface FileRouteTypes {
     | '/app/personal-papers/$personalPaperId'
     | '/app/clubs/'
     | '/app/clubs/$clubId/members'
+    | '/app/clubs/$clubId/'
     | '/app/clubs/$clubId/schedule/$scheduleId'
     | '/app/clubs/$clubId/schedule/'
   fileRoutesByTo: FileRoutesByTo
@@ -181,12 +190,12 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/invites/$token'
     | '/app'
-    | '/app/clubs/$clubId'
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
     | '/app/personal-papers/$personalPaperId'
     | '/app/clubs'
     | '/app/clubs/$clubId/members'
+    | '/app/clubs/$clubId'
     | '/app/clubs/$clubId/schedule/$scheduleId'
     | '/app/clubs/$clubId/schedule'
   id:
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/app/personal-papers/$personalPaperId'
     | '/app/clubs/'
     | '/app/clubs/$clubId/members'
+    | '/app/clubs/$clubId/'
     | '/app/clubs/$clubId/schedule/$scheduleId'
     | '/app/clubs/$clubId/schedule/'
   fileRoutesById: FileRoutesById
@@ -302,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClubsClubIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/clubs/$clubId/': {
+      id: '/app/clubs/$clubId/'
+      path: '/'
+      fullPath: '/app/clubs/$clubId/'
+      preLoaderRoute: typeof AppClubsClubIdIndexRouteImport
+      parentRoute: typeof AppClubsClubIdRoute
+    }
     '/app/clubs/$clubId/members': {
       id: '/app/clubs/$clubId/members'
       path: '/members'
@@ -328,12 +345,14 @@ declare module '@tanstack/react-router' {
 
 interface AppClubsClubIdRouteChildren {
   AppClubsClubIdMembersRoute: typeof AppClubsClubIdMembersRoute
+  AppClubsClubIdIndexRoute: typeof AppClubsClubIdIndexRoute
   AppClubsClubIdScheduleScheduleIdRoute: typeof AppClubsClubIdScheduleScheduleIdRoute
   AppClubsClubIdScheduleIndexRoute: typeof AppClubsClubIdScheduleIndexRoute
 }
 
 const AppClubsClubIdRouteChildren: AppClubsClubIdRouteChildren = {
   AppClubsClubIdMembersRoute: AppClubsClubIdMembersRoute,
+  AppClubsClubIdIndexRoute: AppClubsClubIdIndexRoute,
   AppClubsClubIdScheduleScheduleIdRoute: AppClubsClubIdScheduleScheduleIdRoute,
   AppClubsClubIdScheduleIndexRoute: AppClubsClubIdScheduleIndexRoute,
 }
