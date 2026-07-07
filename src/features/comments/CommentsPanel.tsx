@@ -12,6 +12,7 @@ import {
 } from "@/features/comments/api";
 import { commentsQueryOptions } from "@/features/comments/queries";
 import { useCurrentUser } from "@/features/auth/queries";
+import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ export function CommentsPanel({
   const currentMembership = members.data?.find(
     (member) => member.user_id === user.data?.id,
   );
-  const isOwner = currentMembership?.role === "owner";
+  const isManager = isClubManagerRole(currentMembership?.role);
   const [body, setBody] = useState("");
   const create = useMutation({
     mutationFn: () => {
@@ -68,7 +69,7 @@ export function CommentsPanel({
             key={comment.id}
             comment={comment}
             canEdit={comment.author_id === user.data?.id}
-            canDelete={comment.author_id === user.data?.id || isOwner}
+            canDelete={comment.author_id === user.data?.id || isManager}
             scheduleId={scheduleId}
           />
         ))}

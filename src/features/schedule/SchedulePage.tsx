@@ -2,7 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MessageSquareIcon } from "lucide-react";
 
+import { useCurrentUser } from "@/features/auth/queries";
+import { isClubManagerRole } from "@/features/clubs/api";
+import { membersQueryOptions } from "@/features/clubs/queries";
 import { AddPaperDialog } from "@/features/schedule/components/AddPaperDialog";
+import { SchedulePaperActions } from "@/features/schedule/components/SchedulePaperActions";
 import {
   scheduleListQueryOptions,
   scheduleProgressQueryOptions,
@@ -19,8 +23,14 @@ import {
 import { formatOptionalDateLabel } from "@/lib/dates/week";
 
 export function SchedulePage({ clubId }: { clubId: string }) {
+  const currentUser = useCurrentUser();
+  const members = useQuery(membersQueryOptions(clubId));
   const schedule = useQuery(scheduleListQueryOptions(clubId));
   const progress = useQuery(scheduleProgressQueryOptions(clubId));
+  const currentMembership = members.data?.find(
+    (member) => member.user_id === currentUser.data?.id,
+  );
+  const isManager = isClubManagerRole(currentMembership?.role);
   const progressBySchedule = new Map(
     (progress.data ?? []).map((row) => [row.schedule_id, row]),
   );
@@ -79,7 +89,13 @@ export function SchedulePage({ clubId }: { clubId: string }) {
                   )}
                 </TableCell>
                 <TableCell>
-                  <MessageSquareIcon className="size-4 text-muted-foreground" />
+                  <div className="flex justify-end">
+                    {isManager ? (
+                      <SchedulePaperActions schedule={row} />
+                    ) : (
+                      <MessageSquareIcon className="size-4 text-muted-foreground" />
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );

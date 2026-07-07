@@ -15,7 +15,7 @@ export type Profile = ProfileRow;
 export type ProfileMembership = {
   club_id: string;
   created_at: string;
-  role: "owner" | "member";
+  role: Database["public"]["Enums"]["club_role"];
   clubs: {
     id: string;
     name: string;

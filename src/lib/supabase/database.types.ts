@@ -456,6 +456,10 @@ export type Database = {
           token: string;
         }[];
       };
+      delete_scheduled_paper: {
+        Args: { p_schedule_id: string };
+        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
+      };
       get_club_schedule_progress: {
         Args: { p_club_id: string };
         Returns: {
@@ -479,6 +483,14 @@ export type Database = {
       revoke_invite_link: {
         Args: { p_invite_id: string };
         Returns: Database["public"]["Tables"]["club_invites"]["Row"];
+      };
+      set_club_member_role: {
+        Args: {
+          p_club_id: string;
+          p_role: Database["public"]["Enums"]["club_role"];
+          p_user_id: string;
+        };
+        Returns: Database["public"]["Tables"]["club_members"]["Row"];
       };
       schedule_arxiv_paper: {
         Args: {
@@ -526,6 +538,10 @@ export type Database = {
           status: Database["public"]["Enums"]["paper_status"];
         }[];
       };
+      transfer_club_ownership: {
+        Args: { p_club_id: string; p_new_owner_id: string };
+        Returns: Database["public"]["Tables"]["club_members"]["Row"];
+      };
       toggle_personal_paper_read_status: {
         Args: { p_personal_paper_id: string; p_read: boolean };
         Returns: Database["public"]["Tables"]["personal_papers"]["Row"];
@@ -543,9 +559,13 @@ export type Database = {
         Args: { p_page_count: number; p_paper_id: string };
         Returns: Database["public"]["Tables"]["papers"]["Row"];
       };
+      update_scheduled_paper_deadline: {
+        Args: { p_schedule_id: string; p_week_start?: string | null };
+        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
+      };
     };
     Enums: {
-      club_role: "owner" | "member";
+      club_role: "owner" | "admin" | "member";
       invite_status: "pending" | "accepted" | "revoked" | "expired";
       paper_annotation_kind: "highlight" | "question" | "explanation" | "note";
       paper_source_type: "arxiv" | "manual";
@@ -677,7 +697,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      club_role: ["owner", "member"],
+      club_role: ["owner", "admin", "member"],
       invite_status: ["pending", "accepted", "revoked", "expired"],
       paper_annotation_kind: ["highlight", "question", "explanation", "note"],
       paper_source_type: ["arxiv", "manual"],

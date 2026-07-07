@@ -5,6 +5,7 @@ import type { Database } from "@/lib/supabase/database.types";
 export type Club = Database["public"]["Tables"]["clubs"]["Row"];
 export type ClubMember = Database["public"]["Tables"]["club_members"]["Row"];
 export type ClubInvite = Database["public"]["Tables"]["club_invites"]["Row"];
+export type ClubRole = Database["public"]["Enums"]["club_role"];
 
 export type MemberWithProfile = ClubMember & {
   profiles: {
@@ -177,4 +178,50 @@ export async function acceptInvite(token: string) {
   }
 
   return data;
+}
+
+export async function setClubMemberRole(values: {
+  clubId: string;
+  userId: string;
+  role: Exclude<ClubRole, "owner">;
+}) {
+  const { data, error } = await supabase.rpc("set_club_member_role", {
+    p_club_id: values.clubId,
+    p_user_id: values.userId,
+    p_role: values.role,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club member role was not updated.");
+  }
+
+  return data;
+}
+
+export async function transferClubOwnership(values: {
+  clubId: string;
+  newOwnerId: string;
+}) {
+  const { data, error } = await supabase.rpc("transfer_club_ownership", {
+    p_club_id: values.clubId,
+    p_new_owner_id: values.newOwnerId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club ownership was not transferred.");
+  }
+
+  return data;
+}
+
+export function isClubManagerRole(role: ClubRole | null | undefined) {
+  return role === "owner" || role === "admin";
 }
