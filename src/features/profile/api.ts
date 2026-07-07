@@ -119,12 +119,17 @@ export async function updateProfile(
   const userId = await requireCurrentUserId();
   const { data, error } = await supabase
     .from("profiles")
-    .upsert({ id: userId, ...values }, { onConflict: "id" })
+    .update(values)
+    .eq("id", userId)
     .select()
     .single();
 
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new Error("Profile was not updated.");
   }
 
   return data;
