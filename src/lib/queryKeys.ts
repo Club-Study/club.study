@@ -9,6 +9,8 @@ export const queryKeys = {
     root: profileRoot,
     current: (userId: string) => ["profile", userId] as const,
     overview: (userId: string) => ["profile", userId, "overview"] as const,
+    memberships: (userId: string) =>
+      ["profile", userId, "memberships"] as const,
   },
   clubs: {
     all: ["clubs"] as const,

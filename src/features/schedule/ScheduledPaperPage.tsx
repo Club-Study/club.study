@@ -8,6 +8,7 @@ import { LogReadingSessionDialog } from "@/components/log-reading-session-dialog
 import { useCurrentUser } from "@/features/auth/queries";
 import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { SchedulePaperActions } from "@/features/schedule/components/SchedulePaperActions";
 import { scheduleProgressQueryOptions } from "@/features/schedule/queries";
 import {
@@ -224,7 +225,13 @@ export function ScheduledPaperPage({
           {formatAuthors(paper.authors)}
         </p>
         <p className="text-sm text-muted-foreground">
-          Suggested by {schedule.data.suggested_by?.display_name ?? "Unknown"}
+          Suggested by{" "}
+          <ProfileLink
+            userId={schedule.data.suggested_by?.id}
+            className="hover:underline"
+          >
+            {schedule.data.suggested_by?.display_name ?? "Unknown"}
+          </ProfileLink>
         </p>
         <div className="flex flex-wrap gap-2">
           {paper.source_type === "arxiv" && paper.abstract_url ? (

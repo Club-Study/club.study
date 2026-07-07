@@ -5,6 +5,7 @@ import { MessageSquareIcon } from "lucide-react";
 import { useCurrentUser } from "@/features/auth/queries";
 import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { AddPaperDialog } from "@/features/schedule/components/AddPaperDialog";
 import { SchedulePaperActions } from "@/features/schedule/components/SchedulePaperActions";
 import {
@@ -75,7 +76,13 @@ export function SchedulePage({ clubId }: { clubId: string }) {
                   <div className="mt-1 flex gap-2">
                     <Badge variant="outline">{row.papers?.source_type}</Badge>
                     <span className="truncate text-xs text-muted-foreground">
-                      Suggested by {row.suggested_by?.display_name ?? "Unknown"}
+                      Suggested by{" "}
+                      <ProfileLink
+                        userId={row.suggested_by?.id}
+                        className="hover:underline"
+                      >
+                        {row.suggested_by?.display_name ?? "Unknown"}
+                      </ProfileLink>
                     </span>
                   </div>
                 </TableCell>

@@ -17,6 +17,7 @@ import { Route as InvitesTokenRouteImport } from './routes/invites.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppClubsIndexRouteImport } from './routes/app.clubs.index'
+import { Route as AppProfilesUserIdRouteImport } from './routes/app.profiles.$userId'
 import { Route as AppPersonalPapersPersonalPaperIdRouteImport } from './routes/app.personal-papers.$personalPaperId'
 import { Route as AppPapersScheduleIdRouteImport } from './routes/app.papers.$scheduleId'
 import { Route as AppClubsNewRouteImport } from './routes/app.clubs.new'
@@ -64,6 +65,11 @@ const AppProfileRoute = AppProfileRouteImport.update({
 const AppClubsIndexRoute = AppClubsIndexRouteImport.update({
   id: '/clubs/',
   path: '/clubs/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfilesUserIdRoute = AppProfilesUserIdRouteImport.update({
+  id: '/profiles/$userId',
+  path: '/profiles/$userId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPersonalPapersPersonalPaperIdRoute =
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
   '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
+  '/app/profiles/$userId': typeof AppProfilesUserIdRoute
   '/app/clubs/': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
   '/app/clubs/$clubId/': typeof AppClubsClubIdIndexRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
   '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
+  '/app/profiles/$userId': typeof AppProfilesUserIdRoute
   '/app/clubs': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
   '/app/clubs/$clubId': typeof AppClubsClubIdIndexRoute
@@ -157,6 +165,7 @@ export interface FileRoutesById {
   '/app/clubs/new': typeof AppClubsNewRoute
   '/app/papers/$scheduleId': typeof AppPapersScheduleIdRoute
   '/app/personal-papers/$personalPaperId': typeof AppPersonalPapersPersonalPaperIdRoute
+  '/app/profiles/$userId': typeof AppProfilesUserIdRoute
   '/app/clubs/': typeof AppClubsIndexRoute
   '/app/clubs/$clubId/members': typeof AppClubsClubIdMembersRoute
   '/app/clubs/$clubId/': typeof AppClubsClubIdIndexRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
     | '/app/personal-papers/$personalPaperId'
+    | '/app/profiles/$userId'
     | '/app/clubs/'
     | '/app/clubs/$clubId/members'
     | '/app/clubs/$clubId/'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
     | '/app/personal-papers/$personalPaperId'
+    | '/app/profiles/$userId'
     | '/app/clubs'
     | '/app/clubs/$clubId/members'
     | '/app/clubs/$clubId'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/app/clubs/new'
     | '/app/papers/$scheduleId'
     | '/app/personal-papers/$personalPaperId'
+    | '/app/profiles/$userId'
     | '/app/clubs/'
     | '/app/clubs/$clubId/members'
     | '/app/clubs/$clubId/'
@@ -282,6 +294,13 @@ declare module '@tanstack/react-router' {
       path: '/clubs'
       fullPath: '/app/clubs/'
       preLoaderRoute: typeof AppClubsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/profiles/$userId': {
+      id: '/app/profiles/$userId'
+      path: '/profiles/$userId'
+      fullPath: '/app/profiles/$userId'
+      preLoaderRoute: typeof AppProfilesUserIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/personal-papers/$personalPaperId': {
@@ -368,6 +387,7 @@ interface AppRouteChildren {
   AppClubsNewRoute: typeof AppClubsNewRoute
   AppPapersScheduleIdRoute: typeof AppPapersScheduleIdRoute
   AppPersonalPapersPersonalPaperIdRoute: typeof AppPersonalPapersPersonalPaperIdRoute
+  AppProfilesUserIdRoute: typeof AppProfilesUserIdRoute
   AppClubsIndexRoute: typeof AppClubsIndexRoute
 }
 
@@ -378,6 +398,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClubsNewRoute: AppClubsNewRoute,
   AppPapersScheduleIdRoute: AppPapersScheduleIdRoute,
   AppPersonalPapersPersonalPaperIdRoute: AppPersonalPapersPersonalPaperIdRoute,
+  AppProfilesUserIdRoute: AppProfilesUserIdRoute,
   AppClubsIndexRoute: AppClubsIndexRoute,
 }
 

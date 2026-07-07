@@ -14,6 +14,7 @@ import { commentsQueryOptions } from "@/features/comments/queries";
 import { useCurrentUser } from "@/features/auth/queries";
 import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -138,7 +139,10 @@ function CommentItem({
   return (
     <article className="rounded-lg border p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <ProfileLink
+          userId={comment.author_id}
+          className="flex min-w-0 items-center gap-2 rounded-md hover:underline"
+        >
           <PixelAvatar
             avatarId={comment.profiles?.avatar_id}
             color={comment.profiles?.avatar_color}
@@ -153,7 +157,7 @@ function CommentItem({
               {new Date(comment.created_at).toLocaleString()}
             </p>
           </div>
-        </div>
+        </ProfileLink>
         {canEdit || canDelete ? (
           <div className="flex gap-1">
             {editing ? (

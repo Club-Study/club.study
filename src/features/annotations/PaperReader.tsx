@@ -40,6 +40,7 @@ import {
   normalizeClientRect,
 } from "@/features/annotations/position";
 import { useCurrentUser } from "@/features/auth/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 
@@ -674,7 +675,11 @@ function AnnotationCard({
       onClick={onSelect}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <ProfileLink
+          userId={annotation.author_id}
+          className="flex min-w-0 items-center gap-2 rounded-md hover:underline"
+          onClick={(event) => event.stopPropagation()}
+        >
           <PixelAvatar
             avatarId={annotation.profiles?.avatar_id}
             color={annotation.profiles?.avatar_color}
@@ -689,7 +694,7 @@ function AnnotationCard({
               Page {annotation.page_number}
             </p>
           </div>
-        </div>
+        </ProfileLink>
         <span
           className="rounded-full px-2 py-0.5 text-xs capitalize"
           style={{
@@ -724,9 +729,13 @@ function AnnotationCard({
                 className="size-6"
               />
               <div className="min-w-0">
-                <p className="text-xs font-medium">
+                <ProfileLink
+                  userId={reply.author_id}
+                  className="text-xs font-medium hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   {reply.profiles?.display_name ?? "Reader"}
-                </p>
+                </ProfileLink>
                 <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                   {reply.body}
                 </p>

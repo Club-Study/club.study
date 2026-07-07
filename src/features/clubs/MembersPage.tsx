@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { useCurrentUser } from "@/features/auth/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import {
   createInviteLink,
   isClubManagerRole,
@@ -284,7 +285,10 @@ export function MembersPage({ clubId }: { clubId: string }) {
           {(members.data ?? []).map((member) => (
             <TableRow key={`${member.club_id}-${member.user_id}`}>
               <TableCell>
-                <div className="flex items-center gap-2">
+                <ProfileLink
+                  userId={member.user_id}
+                  className="flex w-fit items-center gap-2 rounded-md hover:underline"
+                >
                   <PixelAvatar
                     avatarId={member.profiles?.avatar_id}
                     color={member.profiles?.avatar_color}
@@ -294,7 +298,7 @@ export function MembersPage({ clubId }: { clubId: string }) {
                   <span className="font-medium">
                     {member.profiles?.display_name ?? "Member"}
                   </span>
-                </div>
+                </ProfileLink>
               </TableCell>
               <TableCell>
                 <Badge variant={roleBadgeVariant(member.role)}>

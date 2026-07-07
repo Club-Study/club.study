@@ -9,6 +9,10 @@ type PaperRow = Database["public"]["Tables"]["papers"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type PersonalPaperRow = Database["public"]["Tables"]["personal_papers"]["Row"];
 type ReadingSessionRow = Database["public"]["Tables"]["reading_sessions"]["Row"];
+type ScheduleStatusRow = Pick<
+  Database["public"]["Tables"]["schedule_paper_statuses"]["Row"],
+  "schedule_id" | "status"
+>;
 
 export type Profile = ProfileRow;
 
@@ -108,13 +112,16 @@ export async function ensureProfileFromUser(user: User) {
   return data ?? getProfileById(user.id);
 }
 
-export async function getProfile() {
-  const userId = await requireCurrentUserId();
-  return getProfileById(userId);
+export async function getProfile(userId?: string) {
+  const profileUserId = userId ?? (await requireCurrentUserId());
+  return getProfileById(profileUserId);
 }
 
 export async function updateProfile(
-  values: Pick<Profile, "display_name" | "avatar_id" | "avatar_color" | "bio">,
+  values: Pick<
+    Profile,
+    "display_name" | "avatar_id" | "avatar_color" | "bio" | "is_public"
+  >,
 ) {
   const userId = await requireCurrentUserId();
   const { data, error } = await supabase
@@ -135,21 +142,27 @@ export async function updateProfile(
   return data;
 }
 
-export async function getProfileOverview(): Promise<ProfileOverview> {
-  const userId = await requireCurrentUserId();
+export async function getProfileOverview(userId?: string): Promise<ProfileOverview> {
+  const profileUserId = userId ?? (await requireCurrentUserId());
+  const currentUserId = await requireCurrentUserId();
   const [
     memberships,
     readingLogs,
-    scheduledPapers,
+    scheduleStatuses,
     personalPapers,
     readingSessions,
   ] = await Promise.all([
-    listProfileMemberships(userId),
-    listProfileReadingLogs(userId),
-    listVisibleScheduledPapers(userId),
-    listPersonalPapers(userId),
-    listReadingSessions(userId),
+    listProfileMemberships(profileUserId),
+    listProfileReadingLogs(profileUserId),
+    listScheduleStatuses(profileUserId),
+    listPersonalPapers(profileUserId),
+    listReadingSessions(profileUserId),
   ]);
+  const scheduledPapers = await listProfileScheduledPapers({
+    readingLogs,
+    scheduleStatuses,
+    showAllVisibleSchedules: profileUserId === currentUserId,
+  });
 
   return {
     memberships,
@@ -158,6 +171,10 @@ export async function getProfileOverview(): Promise<ProfileOverview> {
     personalPapers,
     readingSessions,
   };
+}
+
+export async function getProfileMemberships(userId: string) {
+  return listProfileMemberships(userId);
 }
 
 export async function addPersonalArxivPaper(
@@ -357,13 +374,25 @@ async function listProfileReadingLogs(userId: string) {
   });
 }
 
-async function listVisibleScheduledPapers(userId: string) {
-  const [schedules, statuses] = await Promise.all([
-    listVisibleScheduledPaperRows(),
-    listScheduleStatuses(userId),
-  ]);
+async function listProfileScheduledPapers({
+  readingLogs,
+  scheduleStatuses,
+  showAllVisibleSchedules,
+}: {
+  readingLogs: ProfileReadingLog[];
+  scheduleStatuses: ScheduleStatusRow[];
+  showAllVisibleSchedules: boolean;
+}) {
+  const schedules = showAllVisibleSchedules
+    ? await listVisibleScheduledPaperRows()
+    : await listVisibleScheduledPaperRowsById([
+        ...new Set([
+          ...scheduleStatuses.map((row) => row.schedule_id),
+          ...readingLogs.map((log) => log.schedule_id),
+        ]),
+      ]);
   const statusByScheduleId = new Map(
-    statuses.map((row) => [row.schedule_id, row.status]),
+    scheduleStatuses.map((row) => [row.schedule_id, row.status]),
   );
 
   return schedules.map((schedule) =>
@@ -401,6 +430,37 @@ async function listVisibleScheduledPaperRows() {
   return data as unknown as ProfileScheduledPaperRaw[];
 }
 
+async function listVisibleScheduledPaperRowsById(scheduleIds: string[]) {
+  if (scheduleIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("club_paper_schedule")
+    .select(`
+      id,
+      club_id,
+      paper_id,
+      week_start,
+      created_at,
+      clubs(id, name, slug),
+      papers(id, abstract_url, arxiv_id, authors, external_url, pdf_url, page_count, published_at, source_type, title)
+    `)
+    .in("id", scheduleIds)
+    .order("week_start", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Profile scheduled papers query returned no data.");
+  }
+
+  return data as unknown as ProfileScheduledPaperRaw[];
+}
+
 async function listScheduleStatuses(userId: string) {
   const { data, error } = await supabase
     .from("schedule_paper_statuses")
@@ -415,7 +475,7 @@ async function listScheduleStatuses(userId: string) {
     throw new Error("Schedule statuses query returned no data.");
   }
 
-  return data;
+  return data as ScheduleStatusRow[];
 }
 
 async function listPersonalPapers(userId: string) {
