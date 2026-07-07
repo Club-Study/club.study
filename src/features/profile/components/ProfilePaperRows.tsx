@@ -23,10 +23,12 @@ export function ProfilePaperRows({
   view,
   buckets,
   empty,
+  readOnly = false,
 }: {
   view: PaperListView;
   buckets: ProfilePaperBuckets;
   empty: string;
+  readOnly?: boolean;
 }) {
   const rows = getPaperRows(view, buckets).slice(0, 8);
 
@@ -36,7 +38,14 @@ export function ProfilePaperRows({
 
   return rows.map((row) => {
     if (row.kind === "readLog") {
-      return <ReadingLogRow key={row.key} log={row.log} pagesRead={row.pagesRead} />;
+      return (
+        <ReadingLogRow
+          key={row.key}
+          log={row.log}
+          pagesRead={row.pagesRead}
+          readOnly={readOnly}
+        />
+      );
     }
 
     if (row.kind === "personal") {
@@ -45,6 +54,7 @@ export function ProfilePaperRows({
           key={row.key}
           personalPaper={row.personalPaper}
           pagesRead={row.pagesRead}
+          readOnly={readOnly}
         />
       );
     }
@@ -54,6 +64,7 @@ export function ProfilePaperRows({
         key={row.key}
         schedule={row.schedule}
         pagesRead={row.pagesRead}
+        readOnly={readOnly}
       />
     );
   });
@@ -62,15 +73,18 @@ export function ProfilePaperRows({
 function ReadingLogRow({
   log,
   pagesRead,
+  readOnly,
 }: {
   log: ProfileReadingLog;
   pagesRead: number;
+  readOnly: boolean;
 }) {
   return (
     <ScheduledPaperRow
       schedule={log.club_paper_schedule}
       pagesRead={pagesRead}
       readAt={log.read_at}
+      readOnly={readOnly}
     />
   );
 }
@@ -79,10 +93,12 @@ function ScheduledPaperRow({
   schedule,
   pagesRead,
   readAt,
+  readOnly,
 }: {
   schedule: ProfileScheduledPaper;
   pagesRead: number;
   readAt?: string;
+  readOnly: boolean;
 }) {
   const paper = schedule.papers;
 
@@ -90,13 +106,17 @@ function ScheduledPaperRow({
     <article className="py-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Link
-            to="/app/papers/$scheduleId"
-            params={{ scheduleId: schedule.id }}
-            className="truncate text-sm font-medium hover:underline"
-          >
-            {paper.title}
-          </Link>
+          {readOnly ? (
+            <p className="truncate text-sm font-medium">{paper.title}</p>
+          ) : (
+            <Link
+              to="/app/papers/$scheduleId"
+              params={{ scheduleId: schedule.id }}
+              className="truncate text-sm font-medium hover:underline"
+            >
+              {paper.title}
+            </Link>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{paper.source_type}</Badge>
             <span>{schedule.clubs.name}</span>
@@ -106,17 +126,19 @@ function ScheduledPaperRow({
             <PaperAuthors authors={paper.authors} />
           </div>
         </div>
-        <PaperLogControl
-          paperId={paper.id}
-          pageCount={paper.page_count}
-          pagesRead={pagesRead}
-          status={schedule.status}
-          target={{
-            kind: "schedule",
-            scheduleId: schedule.id,
-            clubId: schedule.club_id,
-          }}
-        />
+        {readOnly ? null : (
+          <PaperLogControl
+            paperId={paper.id}
+            pageCount={paper.page_count}
+            pagesRead={pagesRead}
+            status={schedule.status}
+            target={{
+              kind: "schedule",
+              scheduleId: schedule.id,
+              clubId: schedule.club_id,
+            }}
+          />
+        )}
       </div>
       <PaperProgress pagesRead={pagesRead} totalPages={paper.page_count} />
     </article>
@@ -126,9 +148,11 @@ function ScheduledPaperRow({
 function PersonalPaperRow({
   personalPaper,
   pagesRead,
+  readOnly,
 }: {
   personalPaper: ProfilePersonalPaper;
   pagesRead: number;
+  readOnly: boolean;
 }) {
   const paper = personalPaper.papers;
   const statusDate = personalPaper.read_at
@@ -139,13 +163,17 @@ function PersonalPaperRow({
     <article className="py-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Link
-            to="/app/personal-papers/$personalPaperId"
-            params={{ personalPaperId: personalPaper.id }}
-            className="truncate text-sm font-medium hover:underline"
-          >
-            {paper.title}
-          </Link>
+          {readOnly ? (
+            <p className="truncate text-sm font-medium">{paper.title}</p>
+          ) : (
+            <Link
+              to="/app/personal-papers/$personalPaperId"
+              params={{ personalPaperId: personalPaper.id }}
+              className="truncate text-sm font-medium hover:underline"
+            >
+              {paper.title}
+            </Link>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{paper.source_type}</Badge>
             <span>Personal</span>
@@ -155,16 +183,18 @@ function PersonalPaperRow({
             <PaperAuthors authors={paper.authors} />
           </div>
         </div>
-        <PaperLogControl
-          paperId={paper.id}
-          pageCount={paper.page_count}
-          pagesRead={pagesRead}
-          status={personalPaper.status}
-          target={{
-            kind: "personal",
-            personalPaperId: personalPaper.id,
-          }}
-        />
+        {readOnly ? null : (
+          <PaperLogControl
+            paperId={paper.id}
+            pageCount={paper.page_count}
+            pagesRead={pagesRead}
+            status={personalPaper.status}
+            target={{
+              kind: "personal",
+              personalPaperId: personalPaper.id,
+            }}
+          />
+        )}
       </div>
       <PaperProgress pagesRead={pagesRead} totalPages={paper.page_count} />
     </article>

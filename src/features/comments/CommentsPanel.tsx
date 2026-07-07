@@ -12,7 +12,9 @@ import {
 } from "@/features/comments/api";
 import { commentsQueryOptions } from "@/features/comments/queries";
 import { useCurrentUser } from "@/features/auth/queries";
+import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
+import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +34,7 @@ export function CommentsPanel({
   const currentMembership = members.data?.find(
     (member) => member.user_id === user.data?.id,
   );
-  const isOwner = currentMembership?.role === "owner";
+  const isManager = isClubManagerRole(currentMembership?.role);
   const [body, setBody] = useState("");
   const create = useMutation({
     mutationFn: () => {
@@ -68,7 +70,7 @@ export function CommentsPanel({
             key={comment.id}
             comment={comment}
             canEdit={comment.author_id === user.data?.id}
-            canDelete={comment.author_id === user.data?.id || isOwner}
+            canDelete={comment.author_id === user.data?.id || isManager}
             scheduleId={scheduleId}
           />
         ))}
@@ -137,7 +139,10 @@ function CommentItem({
   return (
     <article className="rounded-lg border p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <ProfileLink
+          userId={comment.author_id}
+          className="flex min-w-0 items-center gap-2 rounded-md hover:underline"
+        >
           <PixelAvatar
             avatarId={comment.profiles?.avatar_id}
             color={comment.profiles?.avatar_color}
@@ -152,7 +157,7 @@ function CommentItem({
               {new Date(comment.created_at).toLocaleString()}
             </p>
           </div>
-        </div>
+        </ProfileLink>
         {canEdit || canDelete ? (
           <div className="flex gap-1">
             {editing ? (

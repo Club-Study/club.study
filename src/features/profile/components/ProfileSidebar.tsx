@@ -30,7 +30,7 @@ export function ProfileSidebar({
             overview.memberships.map((membership) => (
               <Link
                 key={membership.club_id}
-                to="/app/clubs/$clubId"
+                to="/app/clubs/$clubId/schedule"
                 params={{ clubId: membership.club_id }}
                 className="block rounded-md border p-3 transition-colors hover:bg-muted/35"
               >
