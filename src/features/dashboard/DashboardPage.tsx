@@ -1,108 +1,99 @@
 import { Link } from "@tanstack/react-router";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronRightIcon } from "lucide-react";
 
 import { clubsQueryOptions } from "@/features/clubs/queries";
-import { ProfileLink } from "@/features/profile/components/ProfileLink";
-import {
-  dashboardScheduleQueryOptions,
-  scheduleProgressQueryOptions,
-} from "@/features/schedule/queries";
+import { dashboardScheduleQueryOptions } from "@/features/schedule/queries";
 import { formatOptionalDateLabel, getCurrentWeekStart } from "@/lib/dates/week";
 
 export function DashboardPage() {
   const clubs = useQuery(clubsQueryOptions);
   const currentWeek = getCurrentWeekStart();
   const schedule = useQuery(dashboardScheduleQueryOptions(currentWeek));
-  const upcoming = schedule.data ?? [];
-  const visibleClubIds = [
-    ...new Set(upcoming.map((row) => row.club_id)),
-  ];
-  const progressQueries = useQueries({
-    queries: visibleClubIds.map((clubId) => scheduleProgressQueryOptions(clubId)),
-  });
-  const progressBySchedule = new Map(
-    progressQueries.flatMap((query) => query.data ?? []).map((row) => [
-      row.schedule_id,
-      row,
-    ]),
-  );
+  const feedItems = schedule.data ?? [];
 
   return (
-    <section className="space-y-7">
+    <section className="mx-auto w-full max-w-5xl">
       {clubs.data?.length === 0 ? (
-        <div className="rounded-lg border bg-muted/20 p-4">
-          <h2 className="text-sm font-medium">No clubs yet</h2>
+        <div className="mb-8 border-l border-l-[var(--ring)] bg-card/40 px-4 py-3">
+          <h2 className="text-sm font-medium text-foreground">No clubs yet</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Create a private club to schedule the first paper.
           </p>
         </div>
       ) : null}
 
-      <div>
-        <div className="mb-3">
-          <h2 className="text-sm font-medium">Upcoming papers</h2>
-        </div>
-        <div className="space-y-1">
-          {upcoming.length > 0 ? (
-            upcoming.map((row) => (
-              <div
-                key={row.id}
-                className="-mx-2 block rounded-md px-2 py-3 transition-colors hover:bg-muted/35"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link
-                    to="/app/papers/$scheduleId"
-                    params={{ scheduleId: row.id }}
-                    className="min-w-0 truncate text-sm font-medium hover:underline"
-                  >
-                    {row.papers?.title ?? "Untitled paper"}
-                  </Link>
-                  <span className="text-xs text-muted-foreground">
-                    {formatOptionalDateLabel(row.week_start)}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>{row.clubs?.name ?? "Club"}</span>
-                  <span>
-                    Suggested by{" "}
-                    <ProfileLink
-                      userId={row.suggested_by?.id}
-                      className="hover:underline"
-                    >
-                      {row.suggested_by?.display_name ?? "Unknown"}
-                    </ProfileLink>
-                  </span>
-                  <span>
-                    {progressBySchedule.get(row.id)?.current_user_read
-                      ? "Read"
-                      : "Unread"}
-                  </span>
-                  <span>{formatProgress(progressBySchedule.get(row.id))}</span>
-                </div>
+      <div className="border-y">
+        {feedItems.length > 0 ? (
+          feedItems.map((row, index) => (
+            <Link
+              key={row.id}
+              to="/app/papers/$scheduleId"
+              params={{ scheduleId: row.id }}
+              className="group relative grid gap-4 border-b px-1 py-6 pr-10 transition-colors last:border-b-0 hover:bg-card/70 focus-visible:bg-card/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[11rem_minmax(0,1fr)] md:px-4 md:pr-12"
+            >
+              <div className="space-y-2 text-[11px] leading-5 text-muted-foreground">
+                <p className="font-medium text-foreground/80">
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <p>{row.clubs?.name ?? "Club"}</p>
+                <p>{formatScheduledDate(row.week_start)}</p>
+                <span className="block h-px w-7 bg-border transition-colors group-hover:bg-[var(--ring)]" />
               </div>
-            ))
-          ) : (
-            <p className="p-3 text-sm text-muted-foreground">
-              No upcoming papers scheduled.
-            </p>
-          )}
-        </div>
+
+              <div className="min-w-0 space-y-2">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold leading-7 text-foreground md:text-xl">
+                    {row.papers?.title ?? "Untitled paper"}
+                  </h2>
+                  {row.papers?.authors.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      {formatAuthors(row.papers.authors)}
+                    </p>
+                  ) : null}
+                </div>
+                <p className="text-base leading-7 text-muted-foreground">
+                  {truncateText(row.papers?.abstract)}
+                </p>
+              </div>
+              <ChevronRightIcon className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 md:right-4" />
+            </Link>
+          ))
+        ) : (
+          <p className="p-6 text-sm text-muted-foreground">
+            No papers have been scheduled yet.
+          </p>
+        )}
       </div>
     </section>
   );
 }
 
-function formatProgress(
-  progress:
-    | {
-        read_count: number;
-        total_members: number;
-      }
-    | undefined,
-) {
-  if (!progress) {
-    return "0/0 read";
+function formatScheduledDate(value: string | null) {
+  return `scheduled for ${formatOptionalDateLabel(value, "no date")}`;
+}
+
+function formatAuthors(authors: string[]) {
+  const visibleAuthors = authors.slice(0, 4).join(", ");
+
+  if (authors.length <= 4) {
+    return visibleAuthors;
   }
 
-  return `${progress.read_count}/${progress.total_members} read`;
+  return `${visibleAuthors}, et al.`;
+}
+
+function truncateText(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return "No abstract available.";
+  }
+
+  const normalized = value.trim().replace(/\s+/g, " ");
+  const maxLength = 220;
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
 }

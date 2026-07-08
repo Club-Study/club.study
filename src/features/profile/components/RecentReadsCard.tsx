@@ -27,11 +27,13 @@ export function RecentReadsCard({
   }
 
   return (
-    <section className="rounded-lg border bg-card p-4">
+    <section className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-medium">Papers</h2>
+            <h2 className="text-[11px] font-medium uppercase text-muted-foreground">
+              Papers
+            </h2>
             <span className="text-xs text-muted-foreground">
               {getViewCount(view, buckets)} total
             </span>
@@ -40,7 +42,7 @@ export function RecentReadsCard({
         <div className="flex shrink-0 items-center gap-2">
           {readOnly ? null : <AddPersonalPaperDialog />}
           <div
-            className="flex items-center gap-0.5 rounded-md border bg-muted/10 p-0.5"
+            className="flex flex-wrap items-center gap-1"
             role="tablist"
             aria-label="Profile paper status"
           >
@@ -56,7 +58,7 @@ export function RecentReadsCard({
                 id={`profile-paper-tab-${id}`}
                 variant="ghost"
                 size="xs"
-                className="h-6 min-w-0 gap-1 rounded-sm px-1.5 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-xs [&_svg:not([class*='size-'])]:size-3"
+                className="h-7 min-w-0 gap-1 rounded-sm px-2 text-[11px] text-muted-foreground hover:bg-card/70 hover:text-foreground aria-selected:bg-muted/70 aria-selected:text-foreground [&_svg:not([class*='size-'])]:size-3"
                 onClick={() => setView(id)}
               >
                 <Icon aria-hidden="true" />
@@ -70,7 +72,7 @@ export function RecentReadsCard({
         id="profile-paper-panel"
         role="tabpanel"
         aria-labelledby={`profile-paper-tab-${view}`}
-        className="mt-3 divide-y"
+        className="space-y-1"
       >
         <ProfilePaperRows
           view={view}

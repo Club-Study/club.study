@@ -86,7 +86,7 @@ function SidebarProvider({
         data-slot="sidebar-wrapper"
         style={
           {
-            "--sidebar-width": "16rem",
+            "--sidebar-width": "17rem",
             ...style,
           } as React.CSSProperties
         }
@@ -118,7 +118,7 @@ function Sidebar({
         data-slot="sidebar"
         data-state={open ? "expanded" : "collapsed"}
         className={cn(
-          "group/sidebar hidden min-h-dvh shrink-0 overflow-hidden border-r bg-background text-foreground md:flex md:flex-col",
+          "group/sidebar hidden min-h-dvh shrink-0 overflow-hidden border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col",
           collapsible === "icon"
             ? open
               ? "w-(--sidebar-width)"
@@ -134,12 +134,12 @@ function Sidebar({
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent
           side="left"
-          className="w-[min(20rem,calc(100vw-2rem))] gap-0 bg-background p-0 text-foreground"
+          className="w-[min(20rem,calc(100vw-2rem))] gap-0 bg-sidebar p-0 text-sidebar-foreground"
           showCloseButton={false}
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SheetDescription className="sr-only">
-            Main club.study navigation
+            Main COsearch navigation
           </SheetDescription>
           <div className="flex min-h-dvh flex-col">{children}</div>
         </SheetContent>
@@ -189,7 +189,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-header"
-      className={cn("flex h-14 items-center px-3", className)}
+      className={cn("flex h-16 items-center border-b px-4", className)}
       {...props}
     />
   );
@@ -199,7 +199,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-content"
-      className={cn("min-h-0 flex-1 overflow-auto px-2 py-2", className)}
+      className={cn("min-h-0 flex-1 overflow-auto px-3 py-5", className)}
       {...props}
     />
   );
@@ -209,7 +209,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-footer"
-      className={cn("mt-auto border-t p-2", className)}
+      className={cn("mt-auto border-t p-3", className)}
       {...props}
     />
   );
@@ -219,7 +219,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-group"
-      className={cn("grid gap-1", className)}
+      className={cn("grid gap-3", className)}
       {...props}
     />
   );
@@ -233,7 +233,7 @@ function SidebarGroupLabel({
     <div
       data-slot="sidebar-group-label"
       className={cn(
-        "px-2 py-1.5 text-xs font-medium text-muted-foreground",
+        "px-3 py-1 text-[11px] font-medium uppercase text-muted-foreground",
         className,
       )}
       {...props}
@@ -245,7 +245,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
       data-slot="sidebar-menu"
-      className={cn("grid gap-1", className)}
+      className={cn("grid gap-1.5", className)}
       {...props}
     />
   );
@@ -277,8 +277,8 @@ function SidebarMenuButton({
       data-slot="sidebar-menu-button"
       data-active={isActive ? "true" : "false"}
       className={cn(
-        "flex h-9 min-w-0 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-        "data-[active=true]:bg-muted data-[active=true]:font-medium data-[active=true]:text-foreground",
+        "relative flex h-10 min-w-0 items-center rounded-sm px-3 text-[13px] text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",
+        "data-[active=true]:bg-muted/70 data-[active=true]:font-medium data-[active=true]:text-foreground",
         className,
       )}
       {...props}

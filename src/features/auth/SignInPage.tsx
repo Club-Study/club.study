@@ -4,6 +4,7 @@ import { BookOpenText } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
+import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/queries";
@@ -30,19 +31,19 @@ export function SignInPage() {
   }, [currentUser.data, navigate, redirect]);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
-      <section className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-xs">
+    <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
+      <section className="w-full max-w-[26rem] rounded-sm border bg-card/70 p-6 shadow-none">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <BookOpenText className="size-4" />
-          <span>club.study</span>
+          <BookOpenText className="size-4 text-foreground" />
+          <BrandWordmark className="text-[18px]" />
         </div>
-        <h1 className="mt-5 text-xl font-semibold">Sign in</h1>
+        <h1 className="mt-6 text-lg font-semibold">Sign in</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Continue with Google to join or create a private reading club.
         </p>
         <Button
           type="button"
-          className="mt-6 w-full"
+          className="mt-6 w-full rounded-sm"
           disabled={signIn.isPending}
           onClick={() => signIn.mutate()}
         >

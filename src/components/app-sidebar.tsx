@@ -1,13 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  HomeIcon,
-  LibraryIcon,
-  LogOutIcon,
-  UserIcon,
-} from "lucide-react";
+import { Link, useNavigate, type ActiveOptions } from "@tanstack/react-router";
+import { LogOutIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { BrandWordmark } from "@/components/brand-wordmark";
 import { signOut } from "@/features/auth/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -16,7 +12,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -24,23 +19,27 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
+type NavItem = {
+  label: string;
+  to: "/app" | "/app/clubs" | "/app/profile";
+  activeOptions?: ActiveOptions;
+};
+
+const navItems: readonly NavItem[] = [
   {
     label: "Feed",
     to: "/app",
-    icon: HomeIcon,
+    activeOptions: { exact: true },
   },
   {
     label: "Clubs",
     to: "/app/clubs",
-    icon: LibraryIcon,
   },
   {
     label: "Profile",
     to: "/app/profile",
-    icon: UserIcon,
   },
-] as const;
+];
 
 export function AppSidebar() {
   const navigate = useNavigate();
@@ -49,17 +48,12 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <Link to="/app" className="flex min-w-0 items-center">
-          <span className="truncate text-sm font-semibold group-data-[state=collapsed]/sidebar:hidden">
-            club.study
-          </span>
+        <Link to="/app" className="flex min-w-0 items-center px-1">
+          <BrandWordmark className="truncate text-[18px] group-data-[state=collapsed]/sidebar:hidden" />
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[state=collapsed]/sidebar:hidden">
-            Workspace
-          </SidebarGroupLabel>
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.to}>
@@ -103,18 +97,17 @@ function NavLink({
   item: (typeof navItems)[number];
 }) {
   const { setOpenMobile } = useSidebar();
-  const Icon = item.icon;
 
   return (
     <SidebarMenuButton asChild>
       <Link
         to={item.to}
         activeProps={{
-          className: "bg-muted font-medium text-foreground",
+          className: "bg-muted/70 font-medium text-foreground",
         }}
+        activeOptions={item.activeOptions}
         onClick={() => setOpenMobile(false)}
       >
-        <Icon className="size-4" />
         <span className="truncate group-data-[state=collapsed]/sidebar:hidden">
           {item.label}
         </span>

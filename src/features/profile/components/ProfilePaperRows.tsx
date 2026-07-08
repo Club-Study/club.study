@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 
-import { Badge } from "@/components/ui/badge";
 import type {
   ProfilePersonalPaper,
   ProfileReadingLog,
@@ -103,7 +102,7 @@ function ScheduledPaperRow({
   const paper = schedule.papers;
 
   return (
-    <article className="py-3">
+    <article className="-mx-2 rounded-sm px-2 py-3 transition-colors hover:bg-card/70">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           {readOnly ? (
@@ -112,13 +111,13 @@ function ScheduledPaperRow({
             <Link
               to="/app/papers/$scheduleId"
               params={{ scheduleId: schedule.id }}
-              className="truncate text-sm font-medium hover:underline"
+              className="truncate text-sm font-medium hover:text-foreground"
             >
               {paper.title}
             </Link>
           )}
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline">{paper.source_type}</Badge>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="text-[10px] uppercase">{paper.source_type}</span>
             <span>{schedule.clubs.name}</span>
             <span>{formatStatusLabel(schedule.status)}</span>
             <span>{formatOptionalDateLabel(schedule.week_start)}</span>
@@ -160,7 +159,7 @@ function PersonalPaperRow({
     : `Added ${formatReadDate(personalPaper.created_at)}`;
 
   return (
-    <article className="py-3">
+    <article className="-mx-2 rounded-sm px-2 py-3 transition-colors hover:bg-card/70">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           {readOnly ? (
@@ -169,13 +168,13 @@ function PersonalPaperRow({
             <Link
               to="/app/personal-papers/$personalPaperId"
               params={{ personalPaperId: personalPaper.id }}
-              className="truncate text-sm font-medium hover:underline"
+              className="truncate text-sm font-medium hover:text-foreground"
             >
               {paper.title}
             </Link>
           )}
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline">{paper.source_type}</Badge>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="text-[10px] uppercase">{paper.source_type}</span>
             <span>Personal</span>
             <span>{formatStatusLabel(personalPaper.status)}</span>
             <span>{formatOptionalDateLabel(personalPaper.deadline)}</span>

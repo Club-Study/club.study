@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { PencilIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/auth/queries";
 import { ProfileEditDialog } from "@/features/profile/components/ProfileEditDialog";
 import { ProfileLoading } from "@/features/profile/components/ProfileLoading";
@@ -62,29 +64,38 @@ export function ProfilePage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Profile</p>
-          <h1 className="mt-2 text-2xl font-semibold">{profile.data.display_name}</h1>
-        </div>
-        <ProfileEditDialog
-          open={isEditing}
-          onOpenChange={setIsEditing}
-          profile={profile.data}
-          userEmail={user.data.email}
-        />
-      </div>
-
+    <section className="mx-auto max-w-6xl space-y-14">
       <ProfileSummaryCard
         profile={profile.data}
-        userEmail={user.data.email}
         activity={activity}
+        editControl={
+          <ProfileEditDialog
+            open={isEditing}
+            onOpenChange={setIsEditing}
+            profile={profile.data}
+            userEmail={user.data.email}
+            trigger={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="h-6 w-6 rounded-sm text-muted-foreground hover:bg-transparent hover:text-foreground"
+              >
+                <PencilIcon className="size-3.5" />
+                <span className="sr-only">Edit profile</span>
+              </Button>
+            }
+          />
+        }
       />
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <ProfileSidebar profile={profile.data} overview={overview.data} />
-        <div className="min-w-0 space-y-6">
+      <div className="grid min-w-0 gap-12 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <ProfileSidebar
+          profile={profile.data}
+          overview={overview.data}
+          activity={activity}
+        />
+        <div className="min-w-0">
           <RecentReadsCard overview={overview.data} />
         </div>
       </div>
