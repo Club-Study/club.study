@@ -11,6 +11,7 @@ This design follows the completed Feed discovery and density work. It does not r
 - Profile uses a GitHub-inspired two-column composition on wide screens.
 - The identity rail contains the pixel avatar, display name, edit action when allowed, bio, Reading/Planned/Read totals, and joined clubs in that order.
 - Reading activity and the papers workspace occupy the main Profile column.
+- Reading activity shows 52 weeks with the existing rectangular cells and no enclosing card border, background, or padding.
 - Paper status selection changes from five ghost buttons to one compact status dropdown.
 - The dropdown keeps the current default view of **Reading** and preserves the existing client-side status selection behavior.
 - A short adjacent summary exposes the other meaningful status counts without recreating a second toggle mechanism. It excludes the active state and disappears when every other count is zero.
@@ -37,7 +38,7 @@ Club links keep their name, role, description, route, virtualization behavior, h
 
 ### Main Column
 
-The main column begins with the contribution graph under a clear **Reading activity** heading. The graph is presented as a restrained bordered region, similar to GitHub's contribution panel, but uses the existing color scale and activity calculation.
+The main column begins with the contribution graph under a clear **Reading activity** heading. The graph sits directly on the page without an enclosing card border, background, or padding. It shows 52 weeks instead of 49, adding three columns while preserving the existing rectangular cell size, gap, color scale, and seven-row structure. The added columns and reclaimed card padding make the graph modestly longer without stretching its cells.
 
 The papers workspace follows with:
 
@@ -84,7 +85,7 @@ The returned UI model adds `viewerRole` and numeric `memberCount` fields while r
 
 No database schema, RLS policy, function, or migration change is required. The implementation must verify the aggregate query against local authenticated fixture data before completion.
 
-Profile data flow remains unchanged. The layout consumes the current profile, overview, activity, membership, and paper-bucket values without new Profile requests.
+Profile data flow remains unchanged. The layout consumes the current profile, overview, activity, membership, and paper-bucket values without new Profile requests. The client-side contribution calculation covers 52 weeks (`52 × 7` cells) instead of 49.
 
 Both current call sites for the clubs list—`ClubsPage` and `DashboardPage`—pass the authenticated user ID to the user-scoped query. Updating Dashboard is a query-signature and cache-key adaptation only; its Feed layout, filtering, ordering, and behavior remain unchanged.
 
@@ -130,7 +131,7 @@ No generic dashboard-card abstraction is introduced. The Profile rail and Club c
 
 ## Loading, Empty, and Error States
 
-- `ProfileLoading` is reshaped to match the identity-rail/main-column layout so content does not jump dramatically after loading.
+- `ProfileLoading` is reshaped to match the identity-rail/main-column layout, including the frame-free activity region, so content does not jump dramatically after loading.
 - Profile bio, club membership, activity, and paper empty states keep their current meaning.
 - Clubs loading uses repository-card-shaped skeletons if loading is surfaced by the route.
 - The Clubs empty state remains visible within the grid region and does not remove the New Club action.
@@ -154,7 +155,7 @@ Browser verification:
 - Existing limited non-public Profile.
 - Status dropdown switching through all five paper states.
 - Add Paper, edit, paper navigation, and logging controls remain available only where they are today.
-- Contribution graph is complete at 390px mobile, 768px tablet, and 1440px desktop widths.
+- All 52 contribution weeks are complete at 390px mobile, 768px tablet, and 1440px desktop widths.
 - Club grid at one- and two-column breakpoints.
 - Long club names, missing descriptions, empty clubs, and realistic member counts.
 - Light and dark themes, keyboard focus, and no horizontal page overflow.
