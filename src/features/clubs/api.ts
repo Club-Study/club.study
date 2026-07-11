@@ -6,6 +6,14 @@ export type Club = Database["public"]["Tables"]["clubs"]["Row"];
 export type ClubMember = Database["public"]["Tables"]["club_members"]["Row"];
 export type ClubInvite = Database["public"]["Tables"]["club_invites"]["Row"];
 export type ClubRole = Database["public"]["Enums"]["club_role"];
+export type ClubJoinRequest =
+  Database["public"]["Tables"]["club_join_requests"]["Row"];
+export type ClubJoinRequestStatus =
+  Database["public"]["Enums"]["club_join_request_status"];
+export type ClubJoinRequestDecision = Extract<
+  ClubJoinRequestStatus,
+  "approved" | "rejected"
+>;
 
 export type ClubListItem = Club & {
   viewerRole: ClubRole;
@@ -15,6 +23,36 @@ export type ClubListItem = Club & {
 type ClubListQueryRow = Club & {
   viewer_membership: unknown;
   member_count: unknown;
+};
+
+export type ClubDirectoryItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  memberCount: number;
+  viewerRole: ClubRole | null;
+  applicationStatus: ClubJoinRequestStatus | null;
+  applicationCreatedAt: string | null;
+};
+
+export type DiscoverableClubRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  member_count: number;
+  viewer_role: ClubRole | null;
+  application_status: ClubJoinRequestStatus | null;
+  application_created_at: string | null;
+};
+
+export type ClubJoinRequestListItem = {
+  request_id: string;
+  user_id: string;
+  display_name: string;
+  avatar_id: string;
+  avatar_color: string;
+  bio: string | null;
+  created_at: string;
 };
 
 export type MemberWithProfile = ClubMember & {
@@ -64,6 +102,55 @@ export function normalizeClubListRow(row: ClubListQueryRow): ClubListItem {
   };
 }
 
+export async function listDiscoverableClubs(): Promise<ClubDirectoryItem[]> {
+  const { data, error } = await supabase.rpc("list_discoverable_clubs");
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club directory query returned no data.");
+  }
+
+  return (data as unknown as DiscoverableClubRow[]).map(
+    normalizeDiscoverableClubRow,
+  );
+}
+
+export function normalizeDiscoverableClubRow(
+  row: DiscoverableClubRow,
+): ClubDirectoryItem {
+  if (
+    !Number.isFinite(row.member_count) ||
+    !Number.isInteger(row.member_count) ||
+    row.member_count < 0
+  ) {
+    throw new Error("Club directory returned an invalid member count.");
+  }
+
+  if (row.viewer_role !== null && !isClubRole(row.viewer_role)) {
+    throw new Error("Club directory returned an invalid viewer role.");
+  }
+
+  if (
+    row.application_status !== null &&
+    !isClubJoinRequestStatus(row.application_status)
+  ) {
+    throw new Error("Club directory returned an invalid application status.");
+  }
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    memberCount: row.member_count,
+    viewerRole: row.viewer_role,
+    applicationStatus: row.application_status,
+    applicationCreatedAt: row.application_created_at,
+  };
+}
+
 function normalizeViewerMembership(value: unknown): { role: ClubRole } {
   if (!Array.isArray(value) || value.length !== 1) {
     throw new Error(
@@ -109,6 +196,12 @@ function normalizeMemberCount(value: unknown): number {
 
 function isClubRole(value: unknown): value is ClubRole {
   return value === "owner" || value === "admin" || value === "member";
+}
+
+function isClubJoinRequestStatus(
+  value: unknown,
+): value is ClubJoinRequestStatus {
+  return value === "pending" || value === "approved" || value === "rejected";
 }
 
 export async function getClub(clubId: string) {
@@ -205,6 +298,60 @@ export async function listInvites(clubId: string) {
 
   if (!data) {
     throw new Error("Club invites query returned no data.");
+  }
+
+  return data;
+}
+
+export async function applyToClub(clubId: string) {
+  const { data, error } = await supabase.rpc("apply_to_club", {
+    p_club_id: clubId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club application was not created.");
+  }
+
+  return data;
+}
+
+export async function listClubJoinRequests(
+  clubId: string,
+): Promise<ClubJoinRequestListItem[]> {
+  const { data, error } = await supabase.rpc("list_club_join_requests", {
+    p_club_id: clubId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club applications query returned no data.");
+  }
+
+  return data as unknown as ClubJoinRequestListItem[];
+}
+
+export async function reviewClubJoinRequest(values: {
+  requestId: string;
+  decision: ClubJoinRequestDecision;
+}) {
+  const { data, error } = await supabase.rpc("review_club_join_request", {
+    p_request_id: values.requestId,
+    p_decision: values.decision,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Club application was not reviewed.");
   }
 
   return data;

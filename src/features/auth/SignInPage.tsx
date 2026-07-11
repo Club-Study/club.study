@@ -8,6 +8,7 @@ import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/queries";
+import { buildAuthCallbackUrl } from "@/lib/appUrl";
 import { safeAppRedirect } from "@/lib/safe-redirect";
 import { toUserMessage } from "@/lib/user-facing-error";
 
@@ -21,7 +22,7 @@ export function SignInPage() {
   const signIn = useMutation({
     mutationFn: async () => {
       window.localStorage.setItem(redirectStorageKey, redirect);
-      await signInWithGoogle(`${window.location.origin}/auth/callback`);
+      await signInWithGoogle(buildAuthCallbackUrl(redirect));
     },
     onError: (error) =>
       toast.error(toUserMessage(error, "auth", "Could not start sign in.")),

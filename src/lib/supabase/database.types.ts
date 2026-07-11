@@ -92,6 +92,58 @@ export type Database = {
           },
         ]
       }
+      club_join_requests: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["club_join_request_status"]
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["club_join_request_status"]
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["club_join_request_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_join_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_join_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_join_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_members: {
         Row: {
           club_id: string
@@ -707,6 +759,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      apply_to_club: {
+        Args: { p_club_id: string }
+        Returns: {
+          club_id: string
+          created_at: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["club_join_request_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_join_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       consume_arxiv_rate_limit: {
         Args: { p_user_id: string }
         Returns: {
@@ -824,6 +894,30 @@ export type Database = {
           deleted_club: boolean
         }[]
       }
+      list_club_join_requests: {
+        Args: { p_club_id: string }
+        Returns: {
+          avatar_color: string
+          avatar_id: string
+          bio: string
+          created_at: string
+          display_name: string
+          request_id: string
+          user_id: string
+        }[]
+      }
+      list_discoverable_clubs: {
+        Args: never
+        Returns: {
+          application_created_at: string
+          application_status: Database["public"]["Enums"]["club_join_request_status"]
+          description: string
+          id: string
+          member_count: number
+          name: string
+          viewer_role: Database["public"]["Enums"]["club_role"]
+        }[]
+      }
       log_personal_paper_reading_session: {
         Args: { p_pages_read: number; p_personal_paper_id: string }
         Returns: {
@@ -854,6 +948,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "reading_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      review_club_join_request: {
+        Args: { p_decision: string; p_request_id: string }
+        Returns: {
+          club_id: string
+          created_at: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["club_join_request_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_join_requests"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1136,6 +1248,7 @@ export type Database = {
       }
     }
     Enums: {
+      club_join_request_status: "pending" | "approved" | "rejected"
       club_role: "owner" | "member" | "admin"
       invite_status: "pending" | "accepted" | "revoked" | "expired"
       paper_annotation_kind: "highlight" | "question" | "explanation" | "note"
@@ -1271,6 +1384,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      club_join_request_status: ["pending", "approved", "rejected"],
       club_role: ["owner", "member", "admin"],
       invite_status: ["pending", "accepted", "revoked", "expired"],
       paper_annotation_kind: ["highlight", "question", "explanation", "note"],

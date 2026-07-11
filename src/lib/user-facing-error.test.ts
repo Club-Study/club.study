@@ -32,6 +32,27 @@ describe("getUserFacingError", () => {
     });
   });
 
+  it("maps club application races to actionable messages", () => {
+    expect(
+      getUserFacingError(
+        { message: "application already pending" },
+        "club-application",
+      ),
+    ).toEqual({
+      kind: "conflict",
+      message: "You already have a pending application for this club.",
+    });
+    expect(
+      getUserFacingError(
+        { message: "request is no longer pending" },
+        "club-application-review",
+      ),
+    ).toEqual({
+      kind: "conflict",
+      message: "This application has already been reviewed.",
+    });
+  });
+
   it.each([
     [{ code: "23514" }, "invalid-input"],
     [{ code: "42501" }, "forbidden"],

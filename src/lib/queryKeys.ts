@@ -15,9 +15,12 @@ export const queryKeys = {
   clubs: {
     all: ["clubs"] as const,
     list: (userId: string) => ["clubs", "list", userId] as const,
+    directory: (userId: string) => ["clubs", "directory", userId] as const,
     detail: (clubId: string) => ["clubs", clubId] as const,
     members: (clubId: string) => ["clubs", clubId, "members"] as const,
     invites: (clubId: string) => ["clubs", clubId, "invites"] as const,
+    applications: (clubId: string) =>
+      ["clubs", clubId, "applications"] as const,
   },
   schedule: {
     dashboardRoot: scheduleDashboardRoot,

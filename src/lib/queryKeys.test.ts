@@ -23,5 +23,15 @@ describe("queryKeys", () => {
       "list",
       "user-id",
     ]);
+    expect(queryKeys.clubs.directory("user-id")).toEqual([
+      ...queryKeys.clubs.all,
+      "directory",
+      "user-id",
+    ]);
+    expect(queryKeys.clubs.applications("club-id")).toEqual([
+      ...queryKeys.clubs.all,
+      "club-id",
+      "applications",
+    ]);
   });
 });
