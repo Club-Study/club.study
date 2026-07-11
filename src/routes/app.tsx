@@ -56,7 +56,7 @@ function AppRoute() {
         <header className="sticky top-0 z-20 flex h-12 items-center border-b bg-background/95 px-4 backdrop-blur md:hidden">
           <SidebarTrigger />
         </header>
-        <div className="px-4 py-6 md:px-6 lg:px-8">
+        <div className="min-h-dvh px-5 py-8 md:px-10 md:py-12 lg:px-14">
           <Outlet />
         </div>
       </SidebarInset>

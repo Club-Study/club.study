@@ -59,6 +59,7 @@ function renderAvatar(id: PixelAvatarId, color: string) {
   const light = mixHex(color, "#ffffff", 0.54);
   const shadow = mixHex(color, "#000000", 0.24);
   const page = "#f8fafc";
+  const bookPage = "#cbd5e1";
 
   if (id === "cat") {
     return (
@@ -142,8 +143,8 @@ function renderAvatar(id: PixelAvatarId, color: string) {
 
   return (
     <>
-      <P x={3} y={8} w={4} h={4} fill={page} />
-      <P x={9} y={8} w={4} h={4} fill={page} />
+      <P x={3} y={8} w={4} h={4} fill={bookPage} />
+      <P x={9} y={8} w={4} h={4} fill={bookPage} />
       <P x={7} y={9} w={2} h={3} fill={shadow} />
       <P x={4} y={7} w={3} h={1} fill={shadow} />
       <P x={9} y={7} w={3} h={1} fill={shadow} />

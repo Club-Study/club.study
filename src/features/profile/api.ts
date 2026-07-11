@@ -4,6 +4,7 @@ import { profileValuesFromUser } from "@/features/auth/api";
 import type { ArxivMetadata, Paper, PaperStatus } from "@/features/schedule/api";
 import { supabase } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { functionInvocationError } from "@/lib/supabase/functionError";
 
 type PaperRow = Database["public"]["Tables"]["papers"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -181,20 +182,28 @@ export async function addPersonalArxivPaper(
   metadata: ArxivMetadata,
   deadline: string | null,
 ) {
-  const { data, error } = await supabase.rpc("add_personal_arxiv_paper", {
-    p_arxiv_metadata: metadata as unknown as Json,
-    p_deadline: deadline,
+  const { data, error } = await supabase.functions.invoke<{
+    personal_paper_id: string;
+  }>("arxiv-lookup", {
+    body: {
+      action: "personal",
+      input: metadata.arxiv_id,
+      deadline,
+    },
   });
 
   if (error) {
-    throw error;
+    throw await functionInvocationError(
+      error,
+      "Personal arXiv paper was not created.",
+    );
   }
 
-  if (!data) {
+  if (!data?.personal_paper_id) {
     throw new Error("Personal arXiv paper was not created.");
   }
 
-  return getPersonalPaper(data.id);
+  return getPersonalPaper(data.personal_paper_id);
 }
 
 export async function addPersonalManualPaper(
@@ -210,7 +219,7 @@ export async function addPersonalManualPaper(
 ) {
   const { data, error } = await supabase.rpc("add_personal_manual_paper", {
     p_metadata: metadata as unknown as Json,
-    p_deadline: deadline,
+    p_deadline: deadline ?? undefined,
   });
 
   if (error) {
@@ -224,36 +233,17 @@ export async function addPersonalManualPaper(
   return getPersonalPaper(data.id);
 }
 
-export async function togglePersonalPaperReadStatus(
-  personalPaperId: string,
-  read: boolean,
-) {
-  const { data, error } = await supabase.rpc(
-    "toggle_personal_paper_read_status",
-    {
-      p_personal_paper_id: personalPaperId,
-      p_read: read,
-    },
-  );
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Personal paper read status was not updated.");
-  }
-
-  return getPersonalPaper(data.id);
-}
-
-export async function setPersonalPaperStatus(
-  personalPaperId: string,
-  status: PaperStatus,
-) {
-  const { data, error } = await supabase.rpc("set_personal_paper_status", {
-    p_personal_paper_id: personalPaperId,
-    p_status: status,
+export async function savePersonalReadingProgress(values: {
+  personalPaperId: string;
+  currentPage: number;
+  totalPages: number;
+  status: PaperStatus;
+}) {
+  const { data, error } = await supabase.rpc("save_personal_reading_progress", {
+    p_personal_paper_id: values.personalPaperId,
+    p_current_page: values.currentPage,
+    p_total_pages: values.totalPages,
+    p_status: values.status,
   });
 
   if (error) {
@@ -261,30 +251,7 @@ export async function setPersonalPaperStatus(
   }
 
   if (!data) {
-    throw new Error("Personal paper status was not updated.");
-  }
-
-  return getPersonalPaper(data.id);
-}
-
-export async function logPersonalPaperReadingSession(
-  personalPaperId: string,
-  pagesRead: number,
-) {
-  const { data, error } = await supabase.rpc(
-    "log_personal_paper_reading_session",
-    {
-      p_personal_paper_id: personalPaperId,
-      p_pages_read: pagesRead,
-    },
-  );
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Personal paper reading session was not logged.");
+    throw new Error("Personal reading progress was not saved.");
   }
 
   return data;
@@ -341,6 +308,7 @@ async function listProfileReadingLogs(userId: string) {
         id,
         club_id,
         paper_id,
+        page_count,
         week_start,
         created_at,
         clubs(id, name, slug),
@@ -411,6 +379,7 @@ async function listVisibleScheduledPaperRows() {
       id,
       club_id,
       paper_id,
+      page_count,
       week_start,
       created_at,
       clubs(id, name, slug),
@@ -441,6 +410,7 @@ async function listVisibleScheduledPaperRowsById(scheduleIds: string[]) {
       id,
       club_id,
       paper_id,
+      page_count,
       week_start,
       created_at,
       clubs(id, name, slug),
@@ -481,7 +451,9 @@ async function listScheduleStatuses(userId: string) {
 async function listPersonalPapers(userId: string) {
   const { data, error } = await supabase
     .from("personal_papers")
-    .select("id, paper_id, read_at, deadline, status, created_at, papers(*)")
+    .select(
+      "id, paper_id, page_count, read_at, deadline, status, created_at, papers(*)",
+    )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -519,7 +491,9 @@ async function listReadingSessions(userId: string) {
 async function getPersonalPaper(personalPaperId: string) {
   const { data, error } = await supabase
     .from("personal_papers")
-    .select("id, paper_id, read_at, deadline, status, created_at, papers(*)")
+    .select(
+      "id, paper_id, page_count, read_at, deadline, status, created_at, papers(*)",
+    )
     .eq("id", personalPaperId)
     .single();
 
@@ -565,6 +539,7 @@ type ProfileScheduledPaperRaw = Omit<
   ProfileScheduledPaper,
   "status" | "papers"
 > & {
+  page_count?: number | null;
   clubs: ProfileScheduledPaper["clubs"] | null;
   papers: Pick<
     PaperRow,
@@ -592,6 +567,7 @@ type ProfilePersonalPaperRaw = Pick<
   ProfilePersonalPaper,
   "id" | "paper_id" | "read_at" | "deadline" | "status" | "created_at"
 > & {
+  page_count?: number | null;
   papers: PaperRow | null;
 };
 
@@ -620,7 +596,11 @@ function normalizeProfileScheduledPaper(
     status,
     created_at: row.created_at,
     clubs: row.clubs,
-    papers: normalizeProfilePaperSummary(row.papers, row.paper_id),
+    papers: normalizeProfilePaperSummary(
+      row.papers,
+      row.paper_id,
+      row.page_count,
+    ),
   };
 }
 
@@ -638,13 +618,14 @@ function normalizeProfilePersonalPaper(
     deadline: row.deadline,
     status: row.status,
     created_at: row.created_at,
-    papers: normalizePaper(row.papers, row.paper_id),
+    papers: normalizePaper(row.papers, row.paper_id, row.page_count),
   };
 }
 
 function normalizeProfilePaperSummary(
   row: ProfileScheduledPaperRaw["papers"],
   id: string,
+  contextPageCount?: number | null,
 ): ProfilePaperSummary {
   if (!row) {
     throw new Error(`Missing paper "${id}".`);
@@ -657,17 +638,24 @@ function normalizeProfilePaperSummary(
     authors: stringArray(row.authors, `paper "${row.id}" authors`),
     external_url: row.external_url,
     pdf_url: row.pdf_url,
-    page_count: row.page_count,
+    page_count:
+      contextPageCount === undefined ? row.page_count : contextPageCount,
     published_at: row.published_at,
     source_type: row.source_type,
     title: row.title,
   };
 }
 
-function normalizePaper(row: PaperRow, id: string): Paper {
+function normalizePaper(
+  row: PaperRow,
+  id: string,
+  contextPageCount?: number | null,
+): Paper {
   return {
     ...row,
     id: row.id || id,
+    page_count:
+      contextPageCount === undefined ? row.page_count : contextPageCount,
     authors: stringArray(row.authors, `paper "${row.id}" authors`),
   };
 }

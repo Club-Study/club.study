@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useCurrentUser } from "@/features/auth/queries";
 import { acceptInvite } from "@/features/clubs/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { toUserMessage } from "@/lib/user-facing-error";
 import { Button } from "@/components/ui/button";
 
 export function InvitePage({ token }: { token: string }) {
@@ -24,7 +25,10 @@ export function InvitePage({ token }: { token: string }) {
         replace: true,
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "invite", "Could not accept this invite."),
+      ),
   });
   const { isError, isPending, isSuccess, mutate } = accept;
 
@@ -56,7 +60,15 @@ export function InvitePage({ token }: { token: string }) {
   return (
     <InviteShell
       title={accept.isError ? "Invite error" : "Joining club"}
-      body={accept.isError ? accept.error.message : "Accepting invite..."}
+      body={
+        accept.isError
+          ? toUserMessage(
+              accept.error,
+              "invite",
+              "Could not accept this invite.",
+            )
+          : "Accepting invite..."
+      }
     >
       {accept.isError ? (
         <Button

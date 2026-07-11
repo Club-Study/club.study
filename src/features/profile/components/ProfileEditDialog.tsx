@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PencilIcon, SaveIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -19,11 +20,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { updateProfile, type Profile } from "@/features/profile/api";
 import {
+  MAX_PROFILE_BIO_LENGTH,
+  normalizeProfileBio,
+} from "@/features/profile/profileBio";
+import {
   getPixelAvatarLabel,
   pixelAvatarColors,
   pixelAvatarIds,
 } from "@/lib/pixel-avatars";
 import { queryKeys } from "@/lib/queryKeys";
+import { SafeUserError, toUserMessage } from "@/lib/user-facing-error";
 
 type ProfileFormValues = Pick<
   Profile,
@@ -38,11 +44,13 @@ export function ProfileEditDialog({
   onOpenChange,
   profile,
   userEmail,
+  trigger,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   profile: Profile;
   userEmail: string | undefined;
+  trigger?: ReactNode;
 }) {
   const queryClient = useQueryClient();
   const form = useForm<ProfileFormValues>({
@@ -62,7 +70,7 @@ export function ProfileEditDialog({
       const nextDisplayName = values.display_name.trim();
 
       if (!nextDisplayName) {
-        throw new Error("Display name is required.");
+        throw new SafeUserError("Display name is required.");
       }
 
       return updateProfile({
@@ -70,7 +78,7 @@ export function ProfileEditDialog({
         avatar_id: values.avatar_id,
         avatar_color: values.avatar_color,
         is_public: !values.is_private,
-        bio: values.bio?.trim() || null,
+        bio: normalizeProfileBio(values.bio),
       });
     },
     onSuccess: async (nextProfile) => {
@@ -81,16 +89,21 @@ export function ProfileEditDialog({
       onOpenChange(false);
       toast.success("Profile updated");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "profile", "Could not update your profile."),
+      ),
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline">
-          <PencilIcon className="size-4" />
-          Edit profile
-        </Button>
+        {trigger ?? (
+          <Button type="button" variant="outline">
+            <PencilIcon className="size-4" />
+            Edit profile
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
@@ -176,7 +189,12 @@ export function ProfileEditDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="bio">Bio</Label>
-            <Textarea id="bio" rows={4} {...form.register("bio")} />
+            <Textarea
+              id="bio"
+              rows={4}
+              maxLength={MAX_PROFILE_BIO_LENGTH}
+              {...form.register("bio", { maxLength: MAX_PROFILE_BIO_LENGTH })}
+            />
           </div>
           <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
             <Input

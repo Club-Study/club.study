@@ -14,6 +14,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PixelAvatar } from "@/components/pixel-avatar";
+import { QueryErrorNotice } from "@/components/query-error-notice";
 import { useCurrentUser } from "@/features/auth/queries";
 import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import {
@@ -32,6 +33,7 @@ import {
 } from "@/features/clubs/queries";
 import { buildAppUrl } from "@/lib/appUrl";
 import { queryKeys } from "@/lib/queryKeys";
+import { toUserMessage } from "@/lib/user-facing-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +95,10 @@ export function MembersPage({ clubId }: { clubId: string }) {
         toast.info("Copy the link from the invite field.");
       }
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "invite", "Could not create an invite link."),
+      ),
   });
   const revokeInvite = useMutation({
     mutationFn: (inviteId: string) => revokeInviteLink(inviteId),
@@ -104,7 +109,10 @@ export function MembersPage({ clubId }: { clubId: string }) {
       });
       toast.success("Invite revoked");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "invite", "Could not revoke the invite link."),
+      ),
   });
   const updateRole = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: Exclude<ClubRole, "owner"> }) =>
@@ -113,7 +121,10 @@ export function MembersPage({ clubId }: { clubId: string }) {
       await invalidateMemberState(queryClient, clubId);
       toast.success("Role updated");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "member-management", "Could not update the role."),
+      ),
   });
   const transferOwnership = useMutation({
     mutationFn: (newOwnerId: string) =>
@@ -122,7 +133,14 @@ export function MembersPage({ clubId }: { clubId: string }) {
       await invalidateMemberState(queryClient, clubId);
       toast.success("Ownership transferred");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(
+          error,
+          "member-management",
+          "Could not transfer ownership.",
+        ),
+      ),
   });
   const leave = useMutation({
     mutationFn: () => leaveClub(clubId),
@@ -146,11 +164,24 @@ export function MembersPage({ clubId }: { clubId: string }) {
       toast.success(result.deleted_club ? "Club deleted" : "Club left");
       await navigate({ to: "/app/clubs" });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "member-management", "Could not leave the club."),
+      ),
   });
 
+  const queryError = members.error ?? currentUser.error ?? invites.error;
+  if (queryError) {
+    return (
+      <QueryErrorNotice
+        error={queryError}
+        fallbackMessage="Could not load club members. Please try again."
+      />
+    );
+  }
+
   return (
-    <section className="space-y-6">
+    <section className="min-w-0 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">Members</h2>
@@ -272,40 +303,47 @@ export function MembersPage({ clubId }: { clubId: string }) {
         </div>
       ) : null}
 
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead>Member</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Joined</TableHead>
+            <TableHead className="w-20 overflow-hidden text-ellipsis">
+              Role
+            </TableHead>
+            <TableHead className="w-24 overflow-hidden text-ellipsis">
+              Joined
+            </TableHead>
             <TableHead className="w-10"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {(members.data ?? []).map((member) => (
             <TableRow key={`${member.club_id}-${member.user_id}`}>
-              <TableCell>
+              <TableCell className="min-w-0 overflow-hidden">
                 <ProfileLink
                   userId={member.user_id}
-                  className="flex w-fit items-center gap-2 rounded-md hover:underline"
+                  className="flex min-w-0 max-w-full items-center gap-2 rounded-md hover:underline"
                 >
                   <PixelAvatar
                     avatarId={member.profiles?.avatar_id}
                     color={member.profiles?.avatar_color}
                     label={member.profiles?.display_name}
-                    className="size-7"
+                    className="size-7 shrink-0"
                   />
-                  <span className="font-medium">
+                  <span
+                    className="min-w-0 truncate font-medium"
+                    title={member.profiles?.display_name ?? "Member"}
+                  >
                     {member.profiles?.display_name ?? "Member"}
                   </span>
                 </ProfileLink>
               </TableCell>
-              <TableCell>
+              <TableCell className="w-20 overflow-hidden text-ellipsis">
                 <Badge variant={roleBadgeVariant(member.role)}>
                   {member.role}
                 </Badge>
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="w-24 overflow-hidden text-ellipsis text-muted-foreground">
                 {new Date(member.created_at).toLocaleDateString()}
               </TableCell>
               <TableCell>

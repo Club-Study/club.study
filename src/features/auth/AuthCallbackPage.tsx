@@ -6,7 +6,9 @@ import {
   getStoredRedirect,
 } from "@/features/auth/SignInPage";
 import { ensureProfileFromUser } from "@/features/profile/api";
+import { safeAppRedirect } from "@/lib/safe-redirect";
 import { supabase } from "@/lib/supabase/client";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -35,8 +37,8 @@ export function AuthCallbackPage() {
 
         await ensureProfileFromUser(user);
         const redirect =
-          typeof search.redirect === "string" && search.redirect.startsWith("/")
-            ? search.redirect
+          typeof search.redirect === "string"
+            ? safeAppRedirect(search.redirect)
             : getStoredRedirect();
         clearStoredRedirect();
 
@@ -45,7 +47,9 @@ export function AuthCallbackPage() {
         }
       } catch (error) {
         if (active) {
-          setMessage(error instanceof Error ? error.message : "Sign in failed.");
+          setMessage(
+            toUserMessage(error, "auth", "Sign in failed. Please try again."),
+          );
         }
       }
     }

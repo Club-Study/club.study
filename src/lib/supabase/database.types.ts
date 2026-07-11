@@ -4,609 +4,1170 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[];
+  | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       club_invites: {
         Row: {
-          accepted_at: string | null;
-          accepted_by: string | null;
-          club_id: string;
-          created_at: string;
-          created_by: string;
-          expires_at: string | null;
-          id: string;
-          status: Database["public"]["Enums"]["invite_status"];
-          token_hash: string;
-        };
+          accepted_at: string | null
+          accepted_by: string | null
+          club_id: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          status: Database["public"]["Enums"]["invite_status"]
+          token_hash: string
+        }
         Insert: {
-          accepted_at?: string | null;
-          accepted_by?: string | null;
-          club_id: string;
-          created_at?: string;
-          created_by: string;
-          expires_at?: string | null;
-          id?: string;
-          status?: Database["public"]["Enums"]["invite_status"];
-          token_hash: string;
-        };
+          accepted_at?: string | null
+          accepted_by?: string | null
+          club_id: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["invite_status"]
+          token_hash: string
+        }
         Update: {
-          accepted_at?: string | null;
-          accepted_by?: string | null;
-          club_id?: string;
-          created_at?: string;
-          created_by?: string;
-          expires_at?: string | null;
-          id?: string;
-          status?: Database["public"]["Enums"]["invite_status"];
-          token_hash?: string;
-        };
-        Relationships: [];
-      };
+          accepted_at?: string | null
+          accepted_by?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["invite_status"]
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_invites_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_invites_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_members: {
         Row: {
-          club_id: string;
-          created_at: string;
-          role: Database["public"]["Enums"]["club_role"];
-          user_id: string;
-        };
+          club_id: string
+          created_at: string
+          role: Database["public"]["Enums"]["club_role"]
+          user_id: string
+        }
         Insert: {
-          club_id: string;
-          created_at?: string;
-          role?: Database["public"]["Enums"]["club_role"];
-          user_id: string;
-        };
+          club_id: string
+          created_at?: string
+          role?: Database["public"]["Enums"]["club_role"]
+          user_id: string
+        }
         Update: {
-          club_id?: string;
-          created_at?: string;
-          role?: Database["public"]["Enums"]["club_role"];
-          user_id?: string;
-        };
-        Relationships: [];
-      };
+          club_id?: string
+          created_at?: string
+          role?: Database["public"]["Enums"]["club_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_members_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_paper_schedule: {
         Row: {
-          club_id: string;
-          created_at: string;
-          created_by: string;
-          id: string;
-          notes: string | null;
-          paper_id: string;
-          week_start: string | null;
-        };
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
         Insert: {
-          club_id: string;
-          created_at?: string;
-          created_by: string;
-          id?: string;
-          notes?: string | null;
-          paper_id: string;
-          week_start?: string | null;
-        };
+          club_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          page_count?: number | null
+          paper_id: string
+          week_start?: string | null
+        }
         Update: {
-          club_id?: string;
-          created_at?: string;
-          created_by?: string;
-          id?: string;
-          notes?: string | null;
-          paper_id?: string;
-          week_start?: string | null;
-        };
-        Relationships: [];
-      };
+          club_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          page_count?: number | null
+          paper_id?: string
+          week_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_paper_schedule_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_paper_schedule_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_paper_schedule_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clubs: {
         Row: {
-          created_at: string;
-          created_by: string;
-          description: string | null;
-          id: string;
-          name: string;
-          slug: string;
-          updated_at: string;
-        };
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
         Insert: {
-          created_at?: string;
-          created_by: string;
-          description?: string | null;
-          id?: string;
-          name: string;
-          slug: string;
-          updated_at?: string;
-        };
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string
+        }
         Update: {
-          created_at?: string;
-          created_by?: string;
-          description?: string | null;
-          id?: string;
-          name?: string;
-          slug?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clubs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
-          author_id: string;
-          body: string;
-          created_at: string;
-          deleted_at: string | null;
-          id: string;
-          schedule_id: string;
-          updated_at: string;
-        };
+          author_id: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          schedule_id: string
+          updated_at: string
+        }
         Insert: {
-          author_id: string;
-          body: string;
-          created_at?: string;
-          deleted_at?: string | null;
-          id?: string;
-          schedule_id: string;
-          updated_at?: string;
-        };
+          author_id: string
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          schedule_id: string
+          updated_at?: string
+        }
         Update: {
-          author_id?: string;
-          body?: string;
-          created_at?: string;
-          deleted_at?: string | null;
-          id?: string;
-          schedule_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          author_id?: string
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          schedule_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "club_paper_schedule"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paper_annotation_replies: {
         Row: {
-          annotation_id: string;
-          author_id: string;
-          body: string;
-          created_at: string;
-          deleted_at: string | null;
-          id: string;
-          updated_at: string;
-        };
+          annotation_id: string
+          author_id: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          updated_at: string
+        }
         Insert: {
-          annotation_id: string;
-          author_id: string;
-          body: string;
-          created_at?: string;
-          deleted_at?: string | null;
-          id?: string;
-          updated_at?: string;
-        };
+          annotation_id: string
+          author_id: string
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          updated_at?: string
+        }
         Update: {
-          annotation_id?: string;
-          author_id?: string;
-          body?: string;
-          created_at?: string;
-          deleted_at?: string | null;
-          id?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          annotation_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_annotation_replies_annotation_id_fkey"
+            columns: ["annotation_id"]
+            isOneToOne: false
+            referencedRelation: "paper_annotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_annotation_replies_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paper_annotations: {
         Row: {
-          author_id: string;
-          body: string | null;
-          color: string;
-          created_at: string;
-          deleted_at: string | null;
-          id: string;
-          kind: Database["public"]["Enums"]["paper_annotation_kind"];
-          page_number: number;
-          paper_id: string;
-          position: Json;
-          quote: string | null;
-          schedule_id: string;
-          updated_at: string;
-        };
+          author_id: string
+          body: string | null
+          color: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["paper_annotation_kind"]
+          page_number: number
+          paper_id: string
+          position: Json
+          quote: string | null
+          schedule_id: string
+          updated_at: string
+        }
         Insert: {
-          author_id: string;
-          body?: string | null;
-          color?: string;
-          created_at?: string;
-          deleted_at?: string | null;
-          id?: string;
-          kind: Database["public"]["Enums"]["paper_annotation_kind"];
-          page_number: number;
-          paper_id: string;
-          position: Json;
-          quote?: string | null;
-          schedule_id: string;
-          updated_at?: string;
-        };
+          author_id: string
+          body?: string | null
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["paper_annotation_kind"]
+          page_number: number
+          paper_id: string
+          position: Json
+          quote?: string | null
+          schedule_id: string
+          updated_at?: string
+        }
         Update: {
-          author_id?: string;
-          body?: string | null;
-          color?: string;
-          created_at?: string;
-          deleted_at?: string | null;
-          id?: string;
-          kind?: Database["public"]["Enums"]["paper_annotation_kind"];
-          page_number?: number;
-          paper_id?: string;
-          position?: Json;
-          quote?: string | null;
-          schedule_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          author_id?: string
+          body?: string | null
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["paper_annotation_kind"]
+          page_number?: number
+          paper_id?: string
+          position?: Json
+          quote?: string | null
+          schedule_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_annotations_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_annotations_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_annotations_schedule_paper_fkey"
+            columns: ["schedule_id", "paper_id"]
+            isOneToOne: false
+            referencedRelation: "club_paper_schedule"
+            referencedColumns: ["id", "paper_id"]
+          },
+        ]
+      }
       papers: {
         Row: {
-          abstract: string | null;
-          abstract_url: string | null;
-          arxiv_id: string | null;
-          authors: Json;
-          created_at: string;
-          doi: string | null;
-          external_url: string | null;
-          id: string;
-          license: string | null;
-          page_count: number | null;
-          pdf_url: string | null;
-          published_at: string | null;
-          source_type: Database["public"]["Enums"]["paper_source_type"];
-          source_updated_at: string | null;
-          title: string;
-          updated_at: string;
-        };
+          abstract: string | null
+          abstract_url: string | null
+          arxiv_id: string | null
+          authors: Json
+          created_at: string
+          doi: string | null
+          external_url: string | null
+          id: string
+          license: string | null
+          manual_scope: string | null
+          page_count: number | null
+          pdf_url: string | null
+          published_at: string | null
+          source_type: Database["public"]["Enums"]["paper_source_type"]
+          source_updated_at: string | null
+          title: string
+          updated_at: string
+        }
         Insert: {
-          abstract?: string | null;
-          abstract_url?: string | null;
-          arxiv_id?: string | null;
-          authors?: Json;
-          created_at?: string;
-          doi?: string | null;
-          external_url?: string | null;
-          id?: string;
-          license?: string | null;
-          page_count?: number | null;
-          pdf_url?: string | null;
-          published_at?: string | null;
-          source_type: Database["public"]["Enums"]["paper_source_type"];
-          source_updated_at?: string | null;
-          title: string;
-          updated_at?: string;
-        };
+          abstract?: string | null
+          abstract_url?: string | null
+          arxiv_id?: string | null
+          authors?: Json
+          created_at?: string
+          doi?: string | null
+          external_url?: string | null
+          id?: string
+          license?: string | null
+          manual_scope?: string | null
+          page_count?: number | null
+          pdf_url?: string | null
+          published_at?: string | null
+          source_type: Database["public"]["Enums"]["paper_source_type"]
+          source_updated_at?: string | null
+          title: string
+          updated_at?: string
+        }
         Update: {
-          abstract?: string | null;
-          abstract_url?: string | null;
-          arxiv_id?: string | null;
-          authors?: Json;
-          created_at?: string;
-          doi?: string | null;
-          external_url?: string | null;
-          id?: string;
-          license?: string | null;
-          page_count?: number | null;
-          pdf_url?: string | null;
-          published_at?: string | null;
-          source_type?: Database["public"]["Enums"]["paper_source_type"];
-          source_updated_at?: string | null;
-          title?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          abstract?: string | null
+          abstract_url?: string | null
+          arxiv_id?: string | null
+          authors?: Json
+          created_at?: string
+          doi?: string | null
+          external_url?: string | null
+          id?: string
+          license?: string | null
+          manual_scope?: string | null
+          page_count?: number | null
+          pdf_url?: string | null
+          published_at?: string | null
+          source_type?: Database["public"]["Enums"]["paper_source_type"]
+          source_updated_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       personal_papers: {
         Row: {
-          created_at: string;
-          deadline: string | null;
-          id: string;
-          paper_id: string;
-          read_at: string | null;
-          status: Database["public"]["Enums"]["paper_status"];
-          user_id: string;
-        };
+          created_at: string
+          deadline: string | null
+          id: string
+          page_count: number | null
+          paper_id: string
+          read_at: string | null
+          status: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
         Insert: {
-          created_at?: string;
-          deadline?: string | null;
-          id?: string;
-          paper_id: string;
-          read_at?: string | null;
-          status?: Database["public"]["Enums"]["paper_status"];
-          user_id: string;
-        };
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          page_count?: number | null
+          paper_id: string
+          read_at?: string | null
+          status?: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
         Update: {
-          created_at?: string;
-          deadline?: string | null;
-          id?: string;
-          paper_id?: string;
-          read_at?: string | null;
-          status?: Database["public"]["Enums"]["paper_status"];
-          user_id?: string;
-        };
-        Relationships: [];
-      };
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          page_count?: number | null
+          paper_id?: string
+          read_at?: string | null
+          status?: Database["public"]["Enums"]["paper_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_papers_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_papers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
-          avatar_color: string;
-          avatar_id: string;
-          bio: string | null;
-          created_at: string;
-          display_name: string;
-          id: string;
-          is_public: boolean;
-          updated_at: string;
-        };
+          avatar_color: string
+          avatar_id: string
+          bio: string | null
+          created_at: string
+          display_name: string
+          id: string
+          is_public: boolean
+          updated_at: string
+        }
         Insert: {
-          avatar_color?: string;
-          avatar_id?: string;
-          bio?: string | null;
-          created_at?: string;
-          display_name: string;
-          id: string;
-          is_public?: boolean;
-          updated_at?: string;
-        };
+          avatar_color?: string
+          avatar_id?: string
+          bio?: string | null
+          created_at?: string
+          display_name: string
+          id: string
+          is_public?: boolean
+          updated_at?: string
+        }
         Update: {
-          avatar_color?: string;
-          avatar_id?: string;
-          bio?: string | null;
-          created_at?: string;
-          display_name?: string;
-          id?: string;
-          is_public?: boolean;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          avatar_color?: string
+          avatar_id?: string
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_public?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reading_logs: {
         Row: {
-          id: string;
-          read_at: string;
-          schedule_id: string;
-          user_id: string;
-        };
+          id: string
+          read_at: string
+          schedule_id: string
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          read_at?: string;
-          schedule_id: string;
-          user_id: string;
-        };
+          id?: string
+          read_at?: string
+          schedule_id: string
+          user_id: string
+        }
         Update: {
-          id?: string;
-          read_at?: string;
-          schedule_id?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
+          id?: string
+          read_at?: string
+          schedule_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_logs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "club_paper_schedule"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reading_sessions: {
         Row: {
-          id: string;
-          logged_at: string;
-          pages_read: number;
-          personal_paper_id: string | null;
-          schedule_id: string | null;
-          user_id: string;
-        };
+          id: string
+          logged_at: string
+          pages_read: number
+          personal_paper_id: string | null
+          schedule_id: string | null
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          logged_at?: string;
-          pages_read: number;
-          personal_paper_id?: string | null;
-          schedule_id?: string | null;
-          user_id: string;
-        };
+          id?: string
+          logged_at?: string
+          pages_read: number
+          personal_paper_id?: string | null
+          schedule_id?: string | null
+          user_id: string
+        }
         Update: {
-          id?: string;
-          logged_at?: string;
-          pages_read?: number;
-          personal_paper_id?: string | null;
-          schedule_id?: string | null;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
+          id?: string
+          logged_at?: string
+          pages_read?: number
+          personal_paper_id?: string | null
+          schedule_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_sessions_personal_paper_id_fkey"
+            columns: ["personal_paper_id"]
+            isOneToOne: false
+            referencedRelation: "personal_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_sessions_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "club_paper_schedule"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_paper_statuses: {
         Row: {
-          id: string;
-          read_at: string | null;
-          schedule_id: string;
-          status: Database["public"]["Enums"]["paper_status"];
-          updated_at: string;
-          user_id: string;
-        };
+          id: string
+          read_at: string | null
+          schedule_id: string
+          status: Database["public"]["Enums"]["paper_status"]
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          read_at?: string | null;
-          schedule_id: string;
-          status?: Database["public"]["Enums"]["paper_status"];
-          updated_at?: string;
-          user_id: string;
-        };
+          id?: string
+          read_at?: string | null
+          schedule_id: string
+          status?: Database["public"]["Enums"]["paper_status"]
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          id?: string;
-          read_at?: string | null;
-          schedule_id?: string;
-          status?: Database["public"]["Enums"]["paper_status"];
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-    };
+          id?: string
+          read_at?: string | null
+          schedule_id?: string
+          status?: Database["public"]["Enums"]["paper_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_paper_statuses_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "club_paper_schedule"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_paper_statuses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
     Views: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     Functions: {
       accept_invite: {
-        Args: { p_token: string };
-        Returns: Database["public"]["Tables"]["club_members"]["Row"];
-      };
+        Args: { p_token: string }
+        Returns: {
+          club_id: string
+          created_at: string
+          role: Database["public"]["Enums"]["club_role"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       add_personal_arxiv_paper: {
-        Args: { p_arxiv_metadata: Json; p_deadline?: string | null };
-        Returns: Database["public"]["Tables"]["personal_papers"]["Row"];
-      };
+        Args: { p_arxiv_metadata: Json; p_deadline?: string }
+        Returns: {
+          created_at: string
+          deadline: string | null
+          id: string
+          page_count: number | null
+          paper_id: string
+          read_at: string | null
+          status: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "personal_papers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       add_personal_manual_paper: {
-        Args: { p_deadline?: string | null; p_metadata: Json };
-        Returns: Database["public"]["Tables"]["personal_papers"]["Row"];
-      };
+        Args: { p_deadline?: string; p_metadata: Json }
+        Returns: {
+          created_at: string
+          deadline: string | null
+          id: string
+          page_count: number | null
+          paper_id: string
+          read_at: string | null
+          status: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "personal_papers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      consume_arxiv_rate_limit: {
+        Args: { p_user_id: string }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
+        }[]
+      }
       create_club: {
-        Args: { p_description?: string | null; p_name: string; p_slug: string };
-        Returns: Database["public"]["Tables"]["clubs"]["Row"];
-      };
+        Args: { p_description?: string; p_name: string; p_slug: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "clubs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_invite_link: {
-        Args: { p_club_id: string; p_expires_at?: string | null };
+        Args: { p_club_id: string; p_expires_at?: string }
         Returns: {
-          created_at: string;
-          expires_at: string;
-          id: string;
-          token: string;
-        }[];
-      };
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+        }[]
+      }
       delete_scheduled_paper: {
-        Args: { p_schedule_id: string };
-        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
-      };
+        Args: { p_schedule_id: string }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_paper_schedule"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_club_schedule_progress: {
-        Args: { p_club_id: string };
+        Args: { p_club_id: string }
         Returns: {
-          current_user_pages_read: number;
-          current_user_read: boolean;
-          current_user_session_count: number;
-          current_user_status: Database["public"]["Enums"]["paper_status"];
-          read_count: number;
-          schedule_id: string;
-          total_members: number;
-        }[];
-      };
-      leave_club: {
-        Args: { p_club_id: string };
+          current_user_pages_read: number
+          current_user_read: boolean
+          current_user_session_count: number
+          current_user_status: Database["public"]["Enums"]["paper_status"]
+          read_count: number
+          schedule_id: string
+          total_members: number
+        }[]
+      }
+      import_arxiv_personal: {
+        Args: { p_arxiv_metadata: Json; p_deadline?: string; p_user_id: string }
         Returns: {
-          club_id: string;
-          deleted_club: boolean;
-        }[];
-      };
-      log_personal_paper_reading_session: {
-        Args: { p_pages_read: number; p_personal_paper_id: string };
-        Returns: Database["public"]["Tables"]["reading_sessions"]["Row"];
-      };
-      log_schedule_reading_session: {
-        Args: { p_pages_read: number; p_schedule_id: string };
-        Returns: Database["public"]["Tables"]["reading_sessions"]["Row"];
-      };
-      revoke_invite_link: {
-        Args: { p_invite_id: string };
-        Returns: Database["public"]["Tables"]["club_invites"]["Row"];
-      };
-      set_club_member_role: {
+          created_at: string
+          deadline: string | null
+          id: string
+          page_count: number | null
+          paper_id: string
+          read_at: string | null
+          status: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "personal_papers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      import_arxiv_schedule: {
         Args: {
-          p_club_id: string;
-          p_role: Database["public"]["Enums"]["club_role"];
-          p_user_id: string;
-        };
-        Returns: Database["public"]["Tables"]["club_members"]["Row"];
-      };
+          p_arxiv_metadata: Json
+          p_club_id: string
+          p_notes?: string
+          p_user_id: string
+          p_week_start: string
+        }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_paper_schedule"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      leave_club: {
+        Args: { p_club_id: string }
+        Returns: {
+          club_id: string
+          deleted_club: boolean
+        }[]
+      }
+      log_personal_paper_reading_session: {
+        Args: { p_pages_read: number; p_personal_paper_id: string }
+        Returns: {
+          id: string
+          logged_at: string
+          pages_read: number
+          personal_paper_id: string | null
+          schedule_id: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "reading_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      log_schedule_reading_session: {
+        Args: { p_pages_read: number; p_schedule_id: string }
+        Returns: {
+          id: string
+          logged_at: string
+          pages_read: number
+          personal_paper_id: string | null
+          schedule_id: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "reading_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      revoke_invite_link: {
+        Args: { p_invite_id: string }
+        Returns: {
+          accepted_at: string | null
+          accepted_by: string | null
+          club_id: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          status: Database["public"]["Enums"]["invite_status"]
+          token_hash: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_invites"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_personal_reading_progress: {
+        Args: {
+          p_current_page: number
+          p_personal_paper_id: string
+          p_status: Database["public"]["Enums"]["paper_status"]
+          p_total_pages: number
+        }
+        Returns: {
+          context_id: string
+          current_page: number
+          read: boolean
+          reading_session_id: string
+          saved_status: Database["public"]["Enums"]["paper_status"]
+          total_pages: number
+        }[]
+      }
+      save_schedule_reading_progress: {
+        Args: {
+          p_current_page: number
+          p_schedule_id: string
+          p_status: Database["public"]["Enums"]["paper_status"]
+          p_total_pages: number
+        }
+        Returns: {
+          context_id: string
+          current_page: number
+          read: boolean
+          reading_session_id: string
+          saved_status: Database["public"]["Enums"]["paper_status"]
+          total_pages: number
+        }[]
+      }
       schedule_arxiv_paper: {
         Args: {
-          p_arxiv_metadata: Json;
-          p_club_id: string;
-          p_notes?: string | null;
-          p_week_start?: string | null;
-        };
-        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
-      };
+          p_arxiv_metadata?: Json
+          p_club_id: string
+          p_notes?: string
+          p_week_start?: string
+        }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_paper_schedule"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       schedule_existing_paper: {
         Args: {
-          p_club_id: string;
-          p_notes?: string | null;
-          p_paper_id: string;
-          p_week_start?: string | null;
-        };
-        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
-      };
+          p_club_id: string
+          p_notes?: string
+          p_paper_id: string
+          p_week_start?: string
+        }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_paper_schedule"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       schedule_manual_paper: {
         Args: {
-          p_club_id: string;
-          p_metadata: Json;
-          p_notes?: string | null;
-          p_week_start?: string | null;
-        };
-        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
-      };
+          p_club_id: string
+          p_metadata?: Json
+          p_notes?: string
+          p_week_start?: string
+        }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_paper_schedule"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_club_member_role: {
+        Args: {
+          p_club_id: string
+          p_role: Database["public"]["Enums"]["club_role"]
+          p_user_id: string
+        }
+        Returns: {
+          club_id: string
+          created_at: string
+          role: Database["public"]["Enums"]["club_role"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_personal_paper_status: {
         Args: {
-          p_personal_paper_id: string;
-          p_status: Database["public"]["Enums"]["paper_status"];
-        };
-        Returns: Database["public"]["Tables"]["personal_papers"]["Row"];
-      };
+          p_personal_paper_id: string
+          p_status: Database["public"]["Enums"]["paper_status"]
+        }
+        Returns: {
+          created_at: string
+          deadline: string | null
+          id: string
+          page_count: number | null
+          paper_id: string
+          read_at: string | null
+          status: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "personal_papers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_schedule_paper_status: {
         Args: {
-          p_schedule_id: string;
-          p_status: Database["public"]["Enums"]["paper_status"];
-        };
+          p_schedule_id: string
+          p_status: Database["public"]["Enums"]["paper_status"]
+        }
         Returns: {
-          read: boolean;
-          reading_log_id: string | null;
-          schedule_id: string;
-          status: Database["public"]["Enums"]["paper_status"];
-        }[];
-      };
-      transfer_club_ownership: {
-        Args: { p_club_id: string; p_new_owner_id: string };
-        Returns: Database["public"]["Tables"]["club_members"]["Row"];
-      };
+          read: boolean
+          reading_log_id: string
+          schedule_id: string
+          status: Database["public"]["Enums"]["paper_status"]
+        }[]
+      }
+      soft_delete_comment: { Args: { p_comment_id: string }; Returns: string }
+      soft_delete_paper_annotation: {
+        Args: { p_annotation_id: string }
+        Returns: string
+      }
+      soft_delete_paper_annotation_reply: {
+        Args: { p_reply_id: string }
+        Returns: string
+      }
       toggle_personal_paper_read_status: {
-        Args: { p_personal_paper_id: string; p_read: boolean };
-        Returns: Database["public"]["Tables"]["personal_papers"]["Row"];
-      };
-      toggle_read_status: {
-        Args: { p_read: boolean; p_schedule_id: string };
+        Args: { p_personal_paper_id: string; p_read: boolean }
         Returns: {
-          read: boolean;
-          reading_log_id: string | null;
-          schedule_id: string;
-          status: Database["public"]["Enums"]["paper_status"];
-        }[];
-      };
+          created_at: string
+          deadline: string | null
+          id: string
+          page_count: number | null
+          paper_id: string
+          read_at: string | null
+          status: Database["public"]["Enums"]["paper_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "personal_papers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      toggle_read_status: {
+        Args: { p_read: boolean; p_schedule_id: string }
+        Returns: {
+          read: boolean
+          reading_log_id: string
+          schedule_id: string
+          status: Database["public"]["Enums"]["paper_status"]
+        }[]
+      }
+      transfer_club_ownership: {
+        Args: { p_club_id: string; p_new_owner_id: string }
+        Returns: {
+          club_id: string
+          created_at: string
+          role: Database["public"]["Enums"]["club_role"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_paper_page_count: {
-        Args: { p_page_count: number; p_paper_id: string };
-        Returns: Database["public"]["Tables"]["papers"]["Row"];
-      };
+        Args: { p_page_count: number; p_paper_id: string }
+        Returns: {
+          abstract: string | null
+          abstract_url: string | null
+          arxiv_id: string | null
+          authors: Json
+          created_at: string
+          doi: string | null
+          external_url: string | null
+          id: string
+          license: string | null
+          manual_scope: string | null
+          page_count: number | null
+          pdf_url: string | null
+          published_at: string | null
+          source_type: Database["public"]["Enums"]["paper_source_type"]
+          source_updated_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "papers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_scheduled_paper_deadline: {
-        Args: { p_schedule_id: string; p_week_start?: string | null };
-        Returns: Database["public"]["Tables"]["club_paper_schedule"]["Row"];
-      };
-    };
+        Args: { p_schedule_id: string; p_week_start?: string }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          page_count: number | null
+          paper_id: string
+          week_start: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "club_paper_schedule"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+    }
     Enums: {
-      club_role: "owner" | "admin" | "member";
-      invite_status: "pending" | "accepted" | "revoked" | "expired";
-      paper_annotation_kind: "highlight" | "question" | "explanation" | "note";
-      paper_source_type: "arxiv" | "manual";
-      paper_status: "planned" | "reading" | "on_hold" | "dropped" | "read";
-    };
+      club_role: "owner" | "member" | "admin"
+      invite_status: "pending" | "accepted" | "revoked" | "expired"
+      paper_annotation_kind: "highlight" | "question" | "explanation" | "note"
+      paper_source_type: "arxiv" | "manual"
+      paper_status: "planned" | "reading" | "on_hold" | "dropped" | "read"
+    }
     CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-};
+      [_ in never]: never
+    }
+  }
+}
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R;
+      Row: infer R
     }
     ? R
     : never
@@ -614,104 +1175,107 @@ export type Tables<
         DefaultSchema["Views"])
     ? (DefaultSchema["Tables"] &
         DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R;
+        Row: infer R
       }
       ? R
       : never
-    : never;
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I;
+      Insert: infer I
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I;
+        Insert: infer I
       }
       ? I
       : never
-    : never;
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
+      Update: infer U
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U;
+        Update: infer U
       }
       ? U
       : never
-    : never;
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never;
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
+    : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
-      club_role: ["owner", "admin", "member"],
+      club_role: ["owner", "member", "admin"],
       invite_status: ["pending", "accepted", "revoked", "expired"],
       paper_annotation_kind: ["highlight", "question", "explanation", "note"],
       paper_source_type: ["arxiv", "manual"],
       paper_status: ["planned", "reading", "on_hold", "dropped", "read"],
     },
   },
-} as const;
+} as const

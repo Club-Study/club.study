@@ -114,7 +114,8 @@ export function contributionColor(level: number) {
 }
 
 function buildContributionCells(sessions: ProfileReadingSession[]) {
-  const days = 49 * 7;
+  const weeks = 52;
+  const days = weeks * 7;
   const end = startOfUtcDay(new Date());
   const start = new Date(end);
   start.setUTCDate(start.getUTCDate() - days + 1);
@@ -132,8 +133,8 @@ function buildContributionCells(sessions: ProfileReadingSession[]) {
   }
 
   return Array.from({ length: days }, (_, index) => {
-    const week = index % 49;
-    const day = Math.floor(index / 49);
+    const week = index % weeks;
+    const day = Math.floor(index / weeks);
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + week * 7 + day);
 

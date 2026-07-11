@@ -6,7 +6,7 @@ describe("parseKatexText", () => {
   it("parses inline dollar math", () => {
     expect(parseKatexText("Let $x^2$ be square.")).toEqual([
       { kind: "text", value: "Let " },
-      { kind: "math", value: "x^2", displayMode: false },
+      { kind: "math", value: "x^2", displayMode: false, source: "$x^2$" },
       { kind: "text", value: " be square." },
     ]);
   });
@@ -14,7 +14,7 @@ describe("parseKatexText", () => {
   it("parses display math delimiters", () => {
     expect(parseKatexText("Before\n$$x^2$$\nafter")).toEqual([
       { kind: "text", value: "Before\n" },
-      { kind: "math", value: "x^2", displayMode: true },
+      { kind: "math", value: "x^2", displayMode: true, source: "$$x^2$$" },
       { kind: "text", value: "\nafter" },
     ]);
   });
@@ -25,9 +25,10 @@ describe("parseKatexText", () => {
     ]);
   });
 
-  it("throws on unclosed math delimiters", () => {
-    expect(() => parseKatexText("Let $x be open.")).toThrow(
-      'Unclosed KaTeX delimiter "$"',
-    );
+  it("keeps unclosed math delimiters as text", () => {
+    expect(parseKatexText("Let $x be open.")).toEqual([
+      { kind: "text", value: "Let " },
+      { kind: "text", value: "$x be open." },
+    ]);
   });
 });

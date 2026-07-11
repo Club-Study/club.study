@@ -67,18 +67,19 @@ export async function updateCommentBody(commentId: string, body: string) {
 }
 
 export async function softDeleteComment(commentId: string) {
-  const { data, error } = await supabase
-    .from("comments")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", commentId)
-    .select(commentSelect)
-    .single();
+  const { data, error } = await supabase.rpc("soft_delete_comment", {
+    p_comment_id: commentId,
+  });
 
   if (error) {
     throw error;
   }
 
-  return data as unknown as CommentRow;
+  if (!data) {
+    throw new Error("Comment was not deleted.");
+  }
+
+  return data;
 }
 
 async function requireCurrentUserId() {

@@ -7,6 +7,7 @@ export type KatexTextPart =
       kind: "math";
       value: string;
       displayMode: boolean;
+      source: string;
     };
 
 const MATH_DELIMITERS = [
@@ -40,15 +41,18 @@ export function parseKatexText(text: string): KatexTextPart[] {
     );
 
     if (closeIndex === -1) {
-      throw new Error(
-        `Unclosed KaTeX delimiter "${nextDelimiter.open}" in rendered text.`,
-      );
+      pushTextPart(parts, text.slice(nextDelimiter.index));
+      break;
     }
 
     parts.push({
       kind: "math",
       value: text.slice(mathStart, closeIndex),
       displayMode: nextDelimiter.displayMode,
+      source: text.slice(
+        nextDelimiter.index,
+        closeIndex + nextDelimiter.close.length,
+      ),
     });
 
     cursor = closeIndex + nextDelimiter.close.length;

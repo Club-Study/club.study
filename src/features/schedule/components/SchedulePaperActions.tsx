@@ -31,6 +31,7 @@ import {
   type ScheduleWithPaper,
 } from "@/features/schedule/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 export function SchedulePaperActions({
   schedule,
@@ -54,7 +55,10 @@ export function SchedulePaperActions({
       setEditOpen(false);
       toast.success("Deadline updated");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "schedule-paper", "Could not update the deadline."),
+      ),
   });
   const remove = useMutation({
     mutationFn: () => deleteScheduledPaper(schedule.id),
@@ -68,7 +72,10 @@ export function SchedulePaperActions({
       toast.success("Paper removed");
       onDeleted?.(deletedSchedule.club_id);
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "schedule-paper", "Could not remove the paper."),
+      ),
   });
 
   function openEditDialog(nextOpen: boolean) {

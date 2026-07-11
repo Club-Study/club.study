@@ -1,18 +1,47 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { normalizeFeedSearch } from "@/features/dashboard/feed";
 import {
   getClubProgress,
   getSchedule,
   getScheduleById,
+  listDashboardFeed,
   listClubSchedule,
-  listDashboardSchedule,
+  type FeedFilters,
+  type FeedScope,
 } from "@/features/schedule/api";
 import { queryKeys } from "@/lib/queryKeys";
 
-export function dashboardScheduleQueryOptions(currentWeekStart: string) {
+export function dashboardFeedQueryOptions({
+  userId,
+  scope,
+  currentWeekStart,
+  filters,
+}: {
+  userId: string;
+  scope: FeedScope;
+  currentWeekStart: string;
+  filters: FeedFilters;
+}) {
+  const normalizedFilters = {
+    ...filters,
+    search: normalizeFeedSearch(filters.search),
+  };
+
   return queryOptions({
-    queryKey: queryKeys.schedule.dashboard(currentWeekStart),
-    queryFn: () => listDashboardSchedule(currentWeekStart),
+    queryKey: queryKeys.schedule.dashboard(
+      userId,
+      scope,
+      currentWeekStart,
+      normalizedFilters,
+    ),
+    queryFn: () =>
+      listDashboardFeed({
+        userId,
+        scope,
+        currentWeekStart,
+        filters: normalizedFilters,
+      }),
   });
 }
 

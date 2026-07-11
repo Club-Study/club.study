@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MessageSquareIcon } from "lucide-react";
 
+import { QueryErrorNotice } from "@/components/query-error-notice";
 import { useCurrentUser } from "@/features/auth/queries";
 import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
@@ -36,8 +37,18 @@ export function SchedulePage({ clubId }: { clubId: string }) {
     (progress.data ?? []).map((row) => [row.schedule_id, row]),
   );
 
+  const queryError = schedule.error ?? members.error ?? progress.error ?? currentUser.error;
+  if (queryError) {
+    return (
+      <QueryErrorNotice
+        error={queryError}
+        fallbackMessage="Could not load the club schedule. Please try again."
+      />
+    );
+  }
+
   return (
-    <section className="space-y-4">
+    <section className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">Schedule</h2>
@@ -48,12 +59,16 @@ export function SchedulePage({ clubId }: { clubId: string }) {
         <AddPaperDialog clubId={clubId} />
       </div>
 
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead>Deadline</TableHead>
+            <TableHead className="w-24 overflow-hidden text-ellipsis">
+              Deadline
+            </TableHead>
             <TableHead>Paper</TableHead>
-            <TableHead>Progress</TableHead>
+            <TableHead className="w-20 overflow-hidden text-ellipsis sm:w-28">
+              Progress
+            </TableHead>
             <TableHead className="w-10"></TableHead>
           </TableRow>
         </TableHeader>
@@ -62,20 +77,23 @@ export function SchedulePage({ clubId }: { clubId: string }) {
             const rowProgress = progressBySchedule.get(row.id);
             return (
               <TableRow key={row.id}>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="w-24 overflow-hidden text-ellipsis text-muted-foreground">
                   {formatOptionalDateLabel(row.week_start)}
                 </TableCell>
-                <TableCell className="max-w-[420px]">
+                <TableCell className="min-w-0 overflow-hidden">
                   <Link
                     to="/app/papers/$scheduleId"
                     params={{ scheduleId: row.id }}
-                    className="font-medium hover:underline"
+                    className="block min-w-0 max-w-full truncate font-medium hover:underline"
+                    title={row.papers?.title ?? "Untitled paper"}
                   >
                     {row.papers?.title ?? "Untitled paper"}
                   </Link>
-                  <div className="mt-1 flex gap-2">
-                    <Badge variant="outline">{row.papers?.source_type}</Badge>
-                    <span className="truncate text-xs text-muted-foreground">
+                  <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden">
+                    <Badge variant="outline" className="shrink-0">
+                      {row.papers?.source_type}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                       Suggested by{" "}
                       <ProfileLink
                         userId={row.suggested_by?.id}
@@ -86,7 +104,7 @@ export function SchedulePage({ clubId }: { clubId: string }) {
                     </span>
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="w-20 overflow-hidden text-ellipsis sm:w-28">
                   {rowProgress ? (
                     <span className="text-sm text-muted-foreground">
                       {rowProgress.read_count}/{rowProgress.total_members} read

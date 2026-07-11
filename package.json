@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "bash scripts/dev-all.sh",
+    "dev:restart": "bash scripts/dev-all.sh --restart",
     "route:generate": "tsr generate",
     "build": "npm run route:generate && tsc -b && vite build",
     "preview": "vite preview",
@@ -17,6 +19,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@hookform/resolvers": "5.4.0",
     "@radix-ui/react-avatar": "1.2.1",
     "@radix-ui/react-dialog": "1.1.18",

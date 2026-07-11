@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
+import { PencilIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/auth/queries";
+import { ProfileActivityPanel } from "@/features/profile/components/ProfileActivityPanel";
 import { ProfileEditDialog } from "@/features/profile/components/ProfileEditDialog";
+import { ProfileIdentityRail } from "@/features/profile/components/ProfileIdentityRail";
 import { ProfileLoading } from "@/features/profile/components/ProfileLoading";
-import { ProfileSidebar } from "@/features/profile/components/ProfileSidebar";
-import { ProfileSummaryCard } from "@/features/profile/components/ProfileSummaryCard";
 import { RecentReadsCard } from "@/features/profile/components/RecentReadsCard";
 import { buildProfileActivity } from "@/features/profile/profileActivity";
 import {
@@ -62,29 +64,34 @@ export function ProfilePage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Profile</p>
-          <h1 className="mt-2 text-2xl font-semibold">{profile.data.display_name}</h1>
-        </div>
-        <ProfileEditDialog
-          open={isEditing}
-          onOpenChange={setIsEditing}
+    <section className="mx-auto max-w-6xl">
+      <div className="grid min-w-0 gap-10 xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start xl:gap-12">
+        <ProfileIdentityRail
           profile={profile.data}
-          userEmail={user.data.email}
+          overview={overview.data}
+          activity={activity}
+          editControl={
+            <ProfileEditDialog
+              open={isEditing}
+              onOpenChange={setIsEditing}
+              profile={profile.data}
+              userEmail={user.data.email}
+              trigger={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Edit profile"
+                  className="rounded-sm text-muted-foreground hover:text-foreground"
+                >
+                  <PencilIcon aria-hidden="true" />
+                </Button>
+              }
+            />
+          }
         />
-      </div>
-
-      <ProfileSummaryCard
-        profile={profile.data}
-        userEmail={user.data.email}
-        activity={activity}
-      />
-
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <ProfileSidebar profile={profile.data} overview={overview.data} />
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-10">
+          <ProfileActivityPanel activity={activity} />
           <RecentReadsCard overview={overview.data} />
         </div>
       </div>

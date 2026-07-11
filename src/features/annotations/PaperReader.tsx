@@ -42,6 +42,7 @@ import {
 import { useCurrentUser } from "@/features/auth/queries";
 import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { queryKeys } from "@/lib/queryKeys";
+import { toUserMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -157,7 +158,10 @@ export function PaperReader({
         queryKey: queryKeys.annotations.list(scheduleId, paperId),
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "annotation", "Could not save the annotation."),
+      ),
   });
 
   useEffect(() => {
@@ -787,7 +791,10 @@ function AnnotationReplyForm({
         queryKey: queryKeys.annotations.list(scheduleId, paperId),
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "annotation", "Could not add the reply."),
+      ),
   });
 
   return (

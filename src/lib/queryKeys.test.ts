@@ -16,4 +16,12 @@ describe("queryKeys", () => {
       "paper-id",
     ]);
   });
+
+  it("keeps the user-scoped club list beneath the clubs invalidation prefix", () => {
+    expect(queryKeys.clubs.list("user-id")).toEqual([
+      ...queryKeys.clubs.all,
+      "list",
+      "user-id",
+    ]);
+  });
 });

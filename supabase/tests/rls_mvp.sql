@@ -52,6 +52,18 @@ values
     '{}'::jsonb,
     now(),
     now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000004',
+    'authenticated',
+    'authenticated',
+    'same-name@example.com',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
   );
 
 set local role anon;
@@ -72,6 +84,16 @@ select lives_ok(
   'users can insert their own profile'
 );
 
+select is(
+  (
+    select is_public
+    from public.profiles
+    where id = '00000000-0000-0000-0000-000000000001'
+  ),
+  false,
+  'new profiles are private by default'
+);
+
 select throws_like(
   $$ update public.profiles
      set created_at = now() - interval '1 day'
@@ -88,6 +110,16 @@ select throws_like(
 );
 
 reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', true);
+
+select lives_ok(
+  $$ insert into public.profiles (id, display_name)
+     values ('00000000-0000-0000-0000-000000000004', 'Owner') $$,
+  'different users may share the same display name'
+);
+
+reset role;
 insert into public.profiles (id, display_name)
 values
   ('00000000-0000-0000-0000-000000000002', 'Member'),
@@ -99,6 +131,12 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001
 select lives_ok(
   $$ select public.create_club('RLS Club', 'rls-club', 'Private test club') $$,
   'create_club creates a private club atomically'
+);
+
+select throws_like(
+  $$ select public.create_club('  rls CLUB  ', 'other-rls-club', null) $$,
+  '%clubs_name_normalized_unique_idx%',
+  'club names are globally unique after trimming and case folding'
 );
 
 reset role;
@@ -237,8 +275,25 @@ select throws_like(
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
-select lives_ok(
+
+select throws_like(
   $$ select public.schedule_arxiv_paper(
+       (select id from public.clubs where slug = 'rls-club'),
+       '2026-07-06'::date,
+       '{}'::jsonb,
+       null
+     ) $$,
+  '%permission denied%',
+  'browser-authenticated users cannot write canonical arXiv metadata'
+);
+
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.role', 'service_role', true);
+
+select lives_ok(
+  $$ select public.import_arxiv_schedule(
+       '00000000-0000-0000-0000-000000000002',
        (select id from public.clubs where slug = 'rls-club'),
        '2026-07-06'::date,
        jsonb_build_object(
@@ -255,19 +310,21 @@ select lives_ok(
        ),
        'Read for Monday'
      ) $$,
-  'members can schedule an arXiv paper for a Monday'
+  'trusted service imports canonical arXiv metadata for a club member'
 );
 
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
 select lives_ok(
-  $$ select public.schedule_arxiv_paper(
+  $$ select public.schedule_manual_paper(
        (select id from public.clubs where slug = 'rls-club'),
        '2026-07-07'::date,
        jsonb_build_object(
-         'title', 'Bad Weekday',
+         'title', 'Any Deadline',
          'authors', jsonb_build_array('A. Author'),
-         'arxiv_id', '2401.99999',
-         'abstract_url', 'https://arxiv.org/abs/2401.99999',
-         'pdf_url', 'https://arxiv.org/pdf/2401.99999'
+         'external_url', 'https://example.com/any-deadline'
        ),
        null
      ) $$,
@@ -302,10 +359,11 @@ select is(
   'arXiv paper stores a direct arXiv PDF URL only'
 );
 
-set local role authenticated;
-select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+set local role service_role;
+select set_config('request.jwt.claim.role', 'service_role', true);
 select throws_like(
-  $$ select public.schedule_arxiv_paper(
+  $$ select public.import_arxiv_schedule(
+       '00000000-0000-0000-0000-000000000002',
        (select id from public.clubs where slug = 'rls-club'),
        '2026-07-13'::date,
        jsonb_build_object(
@@ -319,6 +377,21 @@ select throws_like(
      ) $$,
   '%arxiv links must match%',
   'arXiv PDF URLs must match canonical non-versioned arxiv_id'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
+select throws_like(
+  $$ select public.schedule_existing_paper(
+       (select id from public.clubs where slug = 'rls-club'),
+       current_setting('test.current_paper_id')::uuid,
+       '2026-07-06'::date,
+       null
+     ) $$,
+  '%club_paper_schedule_exact_unique_idx%',
+  'the same club, paper, and deadline cannot be scheduled twice'
 );
 
 select throws_like(
@@ -422,9 +495,7 @@ select lives_ok(
        '00000000-0000-0000-0000-000000000002',
        'Looking forward to discussing this.'
      from public.club_paper_schedule cps
-     join public.clubs c on c.id = cps.club_id
-     where c.slug = 'rls-club'
-       and cps.week_start = '2026-07-06'::date $$,
+     where cps.id = '00000000-0000-0000-0000-000000000010' $$,
   'members can comment on scheduled papers'
 );
 
@@ -470,15 +541,24 @@ select throws_like(
   $$ update public.comments
      set body = 'Owner body edit.'
      where schedule_id = '00000000-0000-0000-0000-000000000010' $$,
-  '%owners can only soft-delete comments%',
-  'owners cannot edit another member comment body'
+  '%admins can only soft-delete comments%',
+  'club managers cannot edit another member comment body'
 );
 
 select lives_ok(
-  $$ update public.comments
-     set deleted_at = now()
+  $$ select public.soft_delete_comment(id)
+     from public.comments
      where schedule_id = '00000000-0000-0000-0000-000000000010' $$,
   'owners can soft-delete comments in their clubs'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+select is(
+  (select pg_catalog.count(*) from public.comments),
+  0::bigint,
+  'soft-deleted comment bodies are hidden from club members by RLS'
 );
 
 reset role;
@@ -509,6 +589,32 @@ select lives_ok(
      from public.club_paper_schedule cps
      where cps.id = '00000000-0000-0000-0000-000000000010' $$,
   'members can create paper annotations'
+);
+
+select throws_like(
+  $$ insert into public.paper_annotations (
+       schedule_id,
+       paper_id,
+       author_id,
+       kind,
+       page_number,
+       position,
+       body,
+       color
+     )
+     select
+       '00000000-0000-0000-0000-000000000010',
+       p.id,
+       '00000000-0000-0000-0000-000000000002',
+       'note',
+       1,
+       '{"type":"area"}'::jsonb,
+       'Wrong paper relation.',
+       '#c084fc'
+     from public.papers p
+     where p.title = 'Owner Suggested Paper' $$,
+  '%paper_annotations_schedule_paper_fkey%',
+  'annotations must reference the paper belonging to their schedule'
 );
 
 select lives_ok(
@@ -597,8 +703,8 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
 select lives_ok(
-  $$ update public.paper_annotation_replies
-     set deleted_at = now()
+  $$ select public.soft_delete_paper_annotation_reply(id)
+     from public.paper_annotation_replies
      where annotation_id in (
        select id
        from public.paper_annotations
@@ -608,10 +714,24 @@ select lives_ok(
 );
 
 select lives_ok(
-  $$ update public.paper_annotations
-     set deleted_at = now()
+  $$ select public.soft_delete_paper_annotation(id)
+     from public.paper_annotations
      where schedule_id = '00000000-0000-0000-0000-000000000010' $$,
   'owners can soft-delete paper annotations in their clubs'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+select is(
+  (select pg_catalog.count(*) from public.paper_annotations),
+  0::bigint,
+  'soft-deleted annotation bodies are hidden from club members by RLS'
+);
+select is(
+  (select pg_catalog.count(*) from public.paper_annotation_replies),
+  0::bigint,
+  'soft-deleted annotation reply bodies are hidden from club members by RLS'
 );
 
 reset role;
@@ -641,7 +761,7 @@ select lives_ok(
        '#facc15'
      from public.club_paper_schedule cps
      where cps.id = '00000000-0000-0000-0000-000000000010' $$,
-  'members can annotate the current scheduled paper before replacement'
+  'members can annotate an existing scheduled paper'
 );
 
 reset role;
@@ -658,7 +778,7 @@ select lives_ok(
        ),
        null
      ) $$,
-  'owners can replace a scheduled paper after annotations exist'
+  'members can append another scheduled paper after annotations exist'
 );
 
 reset role;
@@ -673,8 +793,8 @@ select is(
       and pa.paper_id = cps.paper_id
       and pa.deleted_at is null
   ),
-  0::bigint,
-  'annotations for an old paper do not match the current scheduled paper'
+  1::bigint,
+  'appending another schedule preserves the original annotation relation'
 );
 
 reset role;
@@ -687,21 +807,17 @@ select throws_like(
        '00000000-0000-0000-0000-000000000002'
      ) $$,
   '%permission denied%',
-  'members cannot directly insert reading logs outside the toggle RPC'
+  'members cannot directly insert reading logs outside the atomic progress RPC'
 );
 
 select lives_ok(
-  $$ select public.toggle_read_status(
-       (
-         select cps.id
-         from public.club_paper_schedule cps
-         join public.clubs c on c.id = cps.club_id
-         where c.slug = 'rls-club'
-           and cps.week_start = '2026-07-06'::date
-       ),
-       true
+  $$ select public.save_schedule_reading_progress(
+       '00000000-0000-0000-0000-000000000010',
+       10,
+       10,
+       'read'::public.paper_status
      ) $$,
-  'members can mark scheduled papers read'
+  'members can atomically save absolute schedule progress'
 );
 
 select is(
@@ -719,11 +835,13 @@ where schedule_id = '00000000-0000-0000-0000-000000000010'
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
 select lives_ok(
-  $$ select public.toggle_read_status(
+  $$ select public.save_schedule_reading_progress(
        '00000000-0000-0000-0000-000000000010',
-       true
+       10,
+       10,
+       'read'::public.paper_status
      ) $$,
-  'marking an already-read paper read is idempotent'
+  'retrying the same absolute schedule progress is idempotent'
 );
 
 select is(
@@ -752,6 +870,7 @@ select is(
     from public.get_club_schedule_progress(
       (select id from public.clubs where slug = 'rls-club')
     )
+    where schedule_id = '00000000-0000-0000-0000-000000000010'
   ),
   2::bigint,
   'club progress exposes aggregate member count'
@@ -763,6 +882,7 @@ select is(
     from public.get_club_schedule_progress(
       (select id from public.clubs where slug = 'rls-club')
     )
+    where schedule_id = '00000000-0000-0000-0000-000000000010'
   ),
   1::bigint,
   'club progress exposes aggregate read count'
@@ -816,6 +936,672 @@ select throws_like(
   $$ select public.accept_invite('expired-token') $$,
   '%invite has expired%',
   'expired invites cannot be accepted'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
+select throws_like(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Unsafe URL',
+         'authors', jsonb_build_array('A. Author'),
+         'external_url', 'javascript:alert(1)'
+       ),
+       null
+     ) $$,
+  '%valid HTTP(S) URL%',
+  'manual papers reject non-HTTP URL schemes'
+);
+
+select throws_like(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Credential URL',
+         'authors', jsonb_build_array('A. Author'),
+         'external_url', 'https://user:secret@example.com/paper'
+       ),
+       null
+     ) $$,
+  '%without credentials%',
+  'manual papers reject URL userinfo credentials'
+);
+
+select throws_like(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Invalid Authority',
+         'authors', jsonb_build_array('A. Author'),
+         'external_url', 'https://:/paper'
+       ),
+       null
+     ) $$,
+  '%valid HTTP(S) URL%',
+  'manual papers reject invalid URL authorities'
+);
+
+select throws_like(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Dot Segment URL',
+         'authors', jsonb_build_array('A. Author'),
+         'external_url', 'https://example.com/a/../paper'
+       ),
+       null
+     ) $$,
+  '%valid HTTP(S) URL%',
+  'manual paper RPCs reject non-canonical dot segments'
+);
+
+select throws_like(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Invalid Authors',
+         'authors', jsonb_build_array('A. Author', 42),
+         'external_url', 'https://example.com/invalid-authors'
+       ),
+       null
+     ) $$,
+  '%authors must be an array%',
+  'manual paper authors must all be bounded strings'
+);
+
+select lives_ok(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'HTTP Personal Paper',
+         'authors', jsonb_build_array('Reader One'),
+         'external_url', '  HTTP://EXAMPLE.COM/CaseSensitive?Q=Value  '
+       ),
+       '2026-08-01'::date
+     ) $$,
+  'manual papers accept HTTP and normalize only scheme and authority'
+);
+
+select lives_ok(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Idempotent Retry',
+         'authors', jsonb_build_array('Reader One'),
+         'external_url', 'http://EXAMPLE.com:80/CaseSensitive?Q=Value#section'
+       ),
+       null
+     ) $$,
+  'manual paper retries reuse the normalized external URL atomically'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.personal_papers pp
+    join public.papers p on p.id = pp.paper_id
+    where pp.user_id = '00000000-0000-0000-0000-000000000002'
+      and p.external_url = 'http://example.com/CaseSensitive?Q=Value'
+  ),
+  1::bigint,
+  'normalized manual URL identity prevents duplicate personal items'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+select lives_ok(
+  $$ select public.add_personal_manual_paper(
+       jsonb_build_object(
+         'title', 'Independent Owner Metadata',
+         'authors', jsonb_build_array('Different Author'),
+         'external_url', 'http://example.com/CaseSensitive?Q=Value'
+       ),
+       null
+     ) $$,
+  'the same manual URL can be stored independently in another personal scope'
+);
+
+reset role;
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.papers p
+    where p.source_type = 'manual'::public.paper_source_type
+      and p.external_url = 'http://example.com/CaseSensitive?Q=Value'
+  ),
+  2::bigint,
+  'manual URL identity does not leak first-writer metadata across users'
+);
+select is(
+  (
+    select pg_catalog.count(distinct p.manual_scope)
+    from public.papers p
+    where p.source_type = 'manual'::public.paper_source_type
+      and p.external_url = 'http://example.com/CaseSensitive?Q=Value'
+  ),
+  2::bigint,
+  'manual URL deduplication is scoped to one private context'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
+select set_config(
+  'test.personal_paper_id',
+  (
+    select pp.id::text
+    from public.personal_papers pp
+    join public.papers p on p.id = pp.paper_id
+    where pp.user_id = '00000000-0000-0000-0000-000000000002'
+      and p.external_url = 'http://example.com/CaseSensitive?Q=Value'
+  ),
+  false
+);
+
+select lives_ok(
+  $$ select public.schedule_existing_paper(
+       (select id from public.clubs where slug = 'rls-club'),
+       (
+         select pp.paper_id
+         from public.personal_papers pp
+         where pp.id = current_setting('test.personal_paper_id')::uuid
+       ),
+       '2026-08-03'::date,
+       null
+     ) $$,
+  'sharing a personal manual paper into a club creates a scoped schedule copy'
+);
+
+reset role;
+select isnt(
+  (
+    select cps.paper_id
+    from public.club_paper_schedule cps
+    where cps.week_start = '2026-08-03'::date
+  ),
+  (
+    select pp.paper_id
+    from public.personal_papers pp
+    where pp.id = current_setting('test.personal_paper_id')::uuid
+  ),
+  'a club does not reuse the private personal manual-paper row'
+);
+select is(
+  (
+    select p.manual_scope
+    from public.club_paper_schedule cps
+    join public.papers p on p.id = cps.paper_id
+    where cps.week_start = '2026-08-03'::date
+  ),
+  'club:' || (select id::text from public.clubs where slug = 'rls-club'),
+  'the shared manual paper copy belongs to the destination club scope'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
+select lives_ok(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       2,
+       5,
+       'reading'::public.paper_status
+     ) $$,
+  'personal progress stores the first positive absolute delta'
+);
+
+select lives_ok(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       2,
+       5,
+       'reading'::public.paper_status
+     ) $$,
+  'retrying unchanged personal progress is idempotent'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.reading_sessions
+    where personal_paper_id = current_setting('test.personal_paper_id')::uuid
+  ),
+  1::bigint,
+  'an idempotent personal progress retry creates no duplicate session'
+);
+
+select lives_ok(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       5,
+       5,
+       'on_hold'::public.paper_status
+     ) $$,
+  'completed page progress may retain a non-read status'
+);
+
+select throws_like(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       4,
+       5,
+       'reading'::public.paper_status
+     ) $$,
+  '%cannot move backwards%',
+  'absolute personal progress rejects regressions'
+);
+
+select throws_like(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       6,
+       5,
+       'reading'::public.paper_status
+     ) $$,
+  '%cannot exceed total pages%',
+  'personal progress rejects current page above total pages'
+);
+
+select throws_like(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       5,
+       100001,
+       'reading'::public.paper_status
+     ) $$,
+  '%between 1 and 100000%',
+  'personal progress rejects an unbounded total page count'
+);
+
+reset role;
+select throws_like(
+  $$ insert into public.reading_sessions (
+       personal_paper_id,
+       user_id,
+       pages_read
+     ) values (
+       current_setting('test.personal_paper_id')::uuid,
+       '00000000-0000-0000-0000-000000000002',
+       100001
+     ) $$,
+  '%reading_sessions_pages_read_bounded_check%',
+  'reading session rows enforce the bounded page delta invariant'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
+select lives_ok(
+  $$ select public.save_personal_reading_progress(
+       current_setting('test.personal_paper_id')::uuid,
+       5,
+       5,
+       'read'::public.paper_status
+     ) $$,
+  'personal progress atomically records the final read status'
+);
+
+select is(
+  (
+    select pg_catalog.sum(pages_read)
+    from public.reading_sessions
+    where personal_paper_id = current_setting('test.personal_paper_id')::uuid
+  ),
+  5::bigint,
+  'personal reading sessions store only positive deltas to the absolute target'
+);
+
+select is(
+  (
+    select page_count
+    from public.personal_papers
+    where id = current_setting('test.personal_paper_id')::uuid
+  ),
+  5,
+  'personal progress stores a context-scoped page count'
+);
+
+select is(
+  (
+    select status::text
+    from public.personal_papers
+    where id = current_setting('test.personal_paper_id')::uuid
+  ),
+  'read',
+  'personal progress stores status atomically with its page count'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.reading_sessions
+    where schedule_id = '00000000-0000-0000-0000-000000000010'
+      and user_id = '00000000-0000-0000-0000-000000000002'
+  ),
+  1::bigint,
+  'schedule absolute progress retries create no duplicate reading session'
+);
+
+select is(
+  (
+    select page_count
+    from public.club_paper_schedule
+    where id = '00000000-0000-0000-0000-000000000010'
+  ),
+  10,
+  'schedule progress stores a context-scoped page count'
+);
+
+select throws_like(
+  $$ select public.save_schedule_reading_progress(
+       '00000000-0000-0000-0000-000000000010',
+       9,
+       10,
+       'reading'::public.paper_status
+     ) $$,
+  '%cannot move backwards%',
+  'absolute schedule progress rejects regressions'
+);
+
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.role', 'service_role', true);
+
+select throws_like(
+  $$ select public.import_arxiv_personal(
+       '00000000-0000-0000-0000-000000000002',
+       jsonb_build_object(
+         'title', 'Invalid Trusted Authors',
+         'authors', jsonb_build_array('Trusted Author', 42),
+         'arxiv_id', '2402.54321',
+         'abstract_url', 'https://arxiv.org/abs/2402.54321',
+         'pdf_url', 'https://arxiv.org/pdf/2402.54321'
+       ),
+       null
+     ) $$,
+  '%authors must be an array%',
+  'trusted arXiv imports still validate bounded string authors'
+);
+
+select lives_ok(
+  $$ select public.import_arxiv_personal(
+       '00000000-0000-0000-0000-000000000002',
+       jsonb_build_object(
+         'title', 'Trusted Personal arXiv Paper',
+         'authors', jsonb_build_array('Trusted Author'),
+         'arxiv_id', '2402.12345v3',
+         'abstract_url', 'https://arxiv.org/abs/2402.12345',
+         'pdf_url', 'https://arxiv.org/pdf/2402.12345'
+       ),
+       null
+     ) $$,
+  'service role can import trusted arXiv metadata into a personal list'
+);
+
+select lives_ok(
+  $$ select public.consume_arxiv_rate_limit(
+       '00000000-0000-0000-0000-000000000002'
+     )
+     from pg_catalog.generate_series(1, 30) $$,
+  'service role can consume the fixed-window arXiv allowance atomically'
+);
+
+select throws_like(
+  $$ select public.consume_arxiv_rate_limit(
+       '00000000-0000-0000-0000-000000000002'
+     ) $$,
+  '%arXiv lookup rate limit exceeded%',
+  'the thirty-first arXiv lookup in five minutes is rejected'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+update public.profiles
+set is_public = true
+where id = '00000000-0000-0000-0000-000000000002';
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', true);
+
+select is((select pg_catalog.count(*) from public.clubs), 0::bigint,
+  'public personal activity does not expose private clubs');
+select is((select pg_catalog.count(*) from public.club_paper_schedule), 0::bigint,
+  'public personal activity does not expose private schedules');
+select is((select pg_catalog.count(*) from public.reading_logs), 0::bigint,
+  'public personal activity does not expose schedule reading logs');
+select is((select pg_catalog.count(*) from public.schedule_paper_statuses), 0::bigint,
+  'public personal activity does not expose schedule statuses');
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.reading_sessions
+    where schedule_id is not null
+  ),
+  0::bigint,
+  'public personal activity does not expose schedule reading sessions'
+);
+select is((select pg_catalog.count(*) from public.personal_papers), 2::bigint,
+  'public profiles expose only their personal paper list');
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.reading_sessions
+    where personal_paper_id is not null
+  ),
+  2::bigint,
+  'public profiles expose personal-context reading sessions'
+);
+select is((select pg_catalog.count(*) from public.papers), 2::bigint,
+  'outsiders can resolve papers reachable from a public personal list only');
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+update public.profiles
+set is_public = false
+where id = '00000000-0000-0000-0000-000000000002';
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', true);
+select is((select pg_catalog.count(*) from public.personal_papers), 0::bigint,
+  'private profiles hide personal papers from outsiders');
+select is((select pg_catalog.count(*) from public.reading_sessions), 0::bigint,
+  'private profiles hide all reading sessions from outsiders');
+select is((select pg_catalog.count(*) from public.papers), 0::bigint,
+  'private profiles hide their papers from outsiders');
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+create temp table test_deleted_parent_annotation as
+with inserted as (
+  insert into public.paper_annotations (
+    schedule_id,
+    paper_id,
+    author_id,
+    kind,
+    page_number,
+    position,
+    body,
+    color
+  )
+  values (
+    '00000000-0000-0000-0000-000000000010',
+    current_setting('test.current_paper_id')::uuid,
+    '00000000-0000-0000-0000-000000000002',
+    'note',
+    2,
+    '{"type":"area"}'::jsonb,
+    'Parent deletion visibility test',
+    '#c084fc'
+  )
+  returning id
+)
+select id from inserted;
+
+insert into public.paper_annotation_replies (annotation_id, author_id, body)
+select
+  id,
+  '00000000-0000-0000-0000-000000000002',
+  'This reply must disappear with its parent.'
+from test_deleted_parent_annotation;
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+select lives_ok(
+  $$ select public.soft_delete_paper_annotation(
+       (select id from test_deleted_parent_annotation)
+     ) $$,
+  'club managers can soft-delete an annotation without mutating its replies'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.paper_annotation_replies
+    where annotation_id = (select id from test_deleted_parent_annotation)
+  ),
+  0::bigint,
+  'active replies are hidden when their parent annotation is deleted'
+);
+select throws_like(
+  $$ insert into public.paper_annotation_replies (annotation_id, author_id, body)
+     values (
+       (select id from test_deleted_parent_annotation),
+       '00000000-0000-0000-0000-000000000002',
+       'Cannot reply after parent deletion.'
+     ) $$,
+  '%row-level security%',
+  'members cannot reply to a soft-deleted annotation'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+
+select throws_like(
+  $$ select token_hash from public.club_invites limit 1 $$,
+  '%permission denied%',
+  'club managers cannot read stored invite token hashes'
+);
+
+select throws_like(
+  $$ update public.clubs set slug = 'changed-slug' where slug = 'rls-club' $$,
+  '%permission denied%',
+  'club slugs are not directly mutable by browser clients'
+);
+
+select throws_like(
+  $$ delete from public.club_members
+     where club_id = (select id from public.clubs where slug = 'rls-club')
+       and user_id = '00000000-0000-0000-0000-000000000002' $$,
+  '%permission denied%',
+  'club membership mutations require an authorized RPC'
+);
+
+select throws_like(
+  $$ delete from public.club_paper_schedule
+     where id = '00000000-0000-0000-0000-000000000010' $$,
+  '%permission denied%',
+  'scheduled paper deletion requires an authorized RPC'
+);
+
+reset role;
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.schedule_paper_statuses sps
+    full join public.reading_logs rl
+      on rl.schedule_id = sps.schedule_id
+      and rl.user_id = sps.user_id
+    where (sps.status = 'read'::public.paper_status)
+      is distinct from (rl.id is not null)
+  ),
+  0::bigint,
+  'schedule status and legacy reading-log representations stay synchronized'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from information_schema.table_privileges
+    where table_schema = 'public'
+      and grantee = 'anon'
+  ),
+  0::bigint,
+  'anonymous users inherit no public table privileges'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prosecdef
+      and has_function_privilege('anon', p.oid, 'EXECUTE')
+  ),
+  0::bigint,
+  'anonymous users inherit no public RPC execution privileges'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.save_schedule_reading_progress(uuid,integer,integer,public.paper_status)',
+    'EXECUTE'
+  ),
+  'authenticated users may execute the atomic schedule progress RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.toggle_read_status(uuid,boolean)',
+    'EXECUTE'
+  ),
+  'authenticated users cannot execute the legacy read-toggle RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.update_paper_page_count(uuid,integer)',
+    'EXECUTE'
+  ),
+  'authenticated users cannot mutate the legacy global paper page count'
+);
+
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.import_arxiv_personal(uuid,jsonb,date)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.import_arxiv_personal(uuid,jsonb,date)',
+    'EXECUTE'
+  ),
+  'trusted arXiv imports are service-role-only'
+);
+
+select ok(
+  not has_function_privilege(
+    'service_role',
+    'public.log_schedule_reading_session(uuid,integer)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'service_role',
+    'public.set_schedule_paper_status(uuid,public.paper_status)',
+    'EXECUTE'
+  ),
+  'service role cannot accidentally call legacy progress RPCs'
 );
 
 reset role;

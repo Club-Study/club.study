@@ -1,108 +1,201 @@
-import { Link } from "@tanstack/react-router";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
-import { clubsQueryOptions } from "@/features/clubs/queries";
-import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import {
-  dashboardScheduleQueryOptions,
-  scheduleProgressQueryOptions,
-} from "@/features/schedule/queries";
-import { formatOptionalDateLabel, getCurrentWeekStart } from "@/lib/dates/week";
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import { useCurrentUser } from "@/features/auth/queries";
+import { clubsQueryOptions } from "@/features/clubs/queries";
+import { FeedSection } from "@/features/dashboard/components/FeedSection";
+import { FeedToolbar } from "@/features/dashboard/components/FeedToolbar";
+import {
+  getPastPaperState,
+  normalizeFeedSearch,
+  type FeedDensity,
+  type PastPaperFilter,
+} from "@/features/dashboard/feed";
+import { dashboardFeedQueryOptions } from "@/features/schedule/queries";
+import { getCurrentWeekStart } from "@/lib/dates/week";
+
+const densityStorageKey = "club.study.feedDensity";
 
 export function DashboardPage() {
-  const clubs = useQuery(clubsQueryOptions);
-  const currentWeek = getCurrentWeekStart();
-  const schedule = useQuery(dashboardScheduleQueryOptions(currentWeek));
-  const upcoming = schedule.data ?? [];
-  const visibleClubIds = [
-    ...new Set(upcoming.map((row) => row.club_id)),
-  ];
-  const progressQueries = useQueries({
-    queries: visibleClubIds.map((clubId) => scheduleProgressQueryOptions(clubId)),
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
+  const [showPast, setShowPast] = useState(false);
+  const [pastFilter, setPastFilter] = useState<PastPaperFilter>("all");
+  const [density, setDensity] = useState<FeedDensity>(getInitialDensity);
+  const currentWeekStart = getCurrentWeekStart();
+  const user = useCurrentUser();
+  const userId = user.data?.id ?? "";
+  const clubs = useQuery({
+    ...clubsQueryOptions(userId),
+    enabled: Boolean(userId),
   });
-  const progressBySchedule = new Map(
-    progressQueries.flatMap((query) => query.data ?? []).map((row) => [
-      row.schedule_id,
-      row,
-    ]),
+  const filters = useMemo(
+    () => ({
+      clubId: selectedClubId,
+      search: normalizeFeedSearch(deferredSearch),
+    }),
+    [deferredSearch, selectedClubId],
   );
+  const upcoming = useQuery({
+    ...dashboardFeedQueryOptions({
+      userId,
+      scope: "upcoming",
+      currentWeekStart,
+      filters,
+    }),
+    enabled: Boolean(userId),
+  });
+  const past = useQuery({
+    ...dashboardFeedQueryOptions({
+      userId,
+      scope: "past",
+      currentWeekStart,
+      filters,
+    }),
+    enabled: showPast && Boolean(userId),
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(densityStorageKey, density);
+  }, [density]);
+
+  if (clubs.error) {
+    throw clubs.error;
+  }
+
+  if (user.error) {
+    throw user.error;
+  }
+
+  if (!user.isPending && !user.data) {
+    throw new Error("Feed route requires a signed-in user.");
+  }
+
+  if (upcoming.error) {
+    throw upcoming.error;
+  }
+
+  if (showPast && past.error) {
+    throw past.error;
+  }
+
+  const visiblePastItems = (past.data ?? []).filter((item) => {
+    if (pastFilter === "all") {
+      return true;
+    }
+
+    return getPastPaperState(item.currentStatus) === pastFilter;
+  });
+  const hasActiveFilters = Boolean(filters.clubId || filters.search);
 
   return (
-    <section className="space-y-7">
+    <section className="mx-auto w-full max-w-5xl space-y-8">
+      <header className="space-y-5">
+        <div>
+          <h1 className="text-2xl font-semibold leading-tight">Feed</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Upcoming papers across your reading clubs.
+          </p>
+        </div>
+
+        <FeedToolbar
+          search={search}
+          onSearchChange={setSearch}
+          clubs={clubs.data ?? []}
+          selectedClubId={selectedClubId}
+          onClubChange={setSelectedClubId}
+          showPast={showPast}
+          onShowPastChange={setShowPast}
+          density={density}
+          onDensityChange={setDensity}
+        />
+      </header>
+
       {clubs.data?.length === 0 ? (
-        <div className="rounded-lg border bg-muted/20 p-4">
-          <h2 className="text-sm font-medium">No clubs yet</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="rounded-sm bg-muted/30 px-4 py-4">
+          <h2 className="text-sm font-medium text-foreground">No clubs yet</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             Create a private club to schedule the first paper.
           </p>
         </div>
       ) : null}
 
-      <div>
-        <div className="mb-3">
-          <h2 className="text-sm font-medium">Upcoming papers</h2>
-        </div>
-        <div className="space-y-1">
-          {upcoming.length > 0 ? (
-            upcoming.map((row) => (
-              <div
-                key={row.id}
-                className="-mx-2 block rounded-md px-2 py-3 transition-colors hover:bg-muted/35"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link
-                    to="/app/papers/$scheduleId"
-                    params={{ scheduleId: row.id }}
-                    className="min-w-0 truncate text-sm font-medium hover:underline"
-                  >
-                    {row.papers?.title ?? "Untitled paper"}
-                  </Link>
-                  <span className="text-xs text-muted-foreground">
-                    {formatOptionalDateLabel(row.week_start)}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>{row.clubs?.name ?? "Club"}</span>
-                  <span>
-                    Suggested by{" "}
-                    <ProfileLink
-                      userId={row.suggested_by?.id}
-                      className="hover:underline"
-                    >
-                      {row.suggested_by?.display_name ?? "Unknown"}
-                    </ProfileLink>
-                  </span>
-                  <span>
-                    {progressBySchedule.get(row.id)?.current_user_read
-                      ? "Read"
-                      : "Unread"}
-                  </span>
-                  <span>{formatProgress(progressBySchedule.get(row.id))}</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="p-3 text-sm text-muted-foreground">
-              No upcoming papers scheduled.
-            </p>
-          )}
-        </div>
-      </div>
+      <FeedSection
+        id="upcoming-papers"
+        title="Upcoming"
+        items={upcoming.data ?? []}
+        density={density}
+        isLoading={upcoming.isPending}
+        emptyMessage={
+          hasActiveFilters
+            ? "No upcoming papers match the current filters."
+            : "No upcoming papers are scheduled."
+        }
+      />
+
+      {showPast ? (
+        <FeedSection
+          id="past-papers"
+          title="Past"
+          items={visiblePastItems}
+          density={density}
+          isLoading={past.isPending}
+          emptyMessage={pastEmptyMessage(pastFilter, hasActiveFilters)}
+          actions={
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={pastFilter}
+              onValueChange={(value) => {
+                if (
+                  value === "all" ||
+                  value === "read" ||
+                  value === "missed"
+                ) {
+                  setPastFilter(value);
+                }
+              }}
+              aria-label="Past paper status"
+            >
+              <ToggleGroupItem value="all">All</ToggleGroupItem>
+              <ToggleGroupItem value="read">Read</ToggleGroupItem>
+              <ToggleGroupItem value="missed">Missed</ToggleGroupItem>
+            </ToggleGroup>
+          }
+        />
+      ) : null}
     </section>
   );
 }
 
-function formatProgress(
-  progress:
-    | {
-        read_count: number;
-        total_members: number;
-      }
-    | undefined,
-) {
-  if (!progress) {
-    return "0/0 read";
+function getInitialDensity(): FeedDensity {
+  if (typeof window === "undefined") {
+    return "comfortable";
   }
 
-  return `${progress.read_count}/${progress.total_members} read`;
+  const storedDensity = window.localStorage.getItem(densityStorageKey);
+  return storedDensity === "compact" ? "compact" : "comfortable";
+}
+
+function pastEmptyMessage(
+  filter: PastPaperFilter,
+  hasActiveFilters: boolean,
+) {
+  if (filter === "read") {
+    return "No read papers match the current filters.";
+  }
+
+  if (filter === "missed") {
+    return "No missed papers match the current filters.";
+  }
+
+  return hasActiveFilters
+    ? "No past papers match the current filters."
+    : "No past papers yet.";
 }
