@@ -64,6 +64,18 @@ values
     '{}'::jsonb,
     now(),
     now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000005',
+    'authenticated',
+    'authenticated',
+    'profile-bootstrap@example.com',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
   );
 
 set local role anon;
@@ -124,6 +136,31 @@ insert into public.profiles (id, display_name)
 values
   ('00000000-0000-0000-0000-000000000002', 'Member'),
   ('00000000-0000-0000-0000-000000000003', 'Outsider');
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000005', true);
+
+select is(
+  (public.ensure_profile('  Profile Bootstrap  ', 'robot', '#123ABC')).display_name,
+  'Profile Bootstrap',
+  'authenticated users can bootstrap their own profile through the narrow RPC'
+);
+
+select is(
+  (public.ensure_profile('Replacement Name', 'cat', '#654321')).display_name,
+  'Profile Bootstrap',
+  'profile bootstrap is idempotent and does not overwrite existing profile edits'
+);
+
+select is(
+  (
+    select avatar_id
+    from public.profiles
+    where id = '00000000-0000-0000-0000-000000000005'
+  ),
+  'robot',
+  'profile bootstrap keeps the original avatar on repeated calls'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
@@ -1602,6 +1639,266 @@ select ok(
     'EXECUTE'
   ),
   'service role cannot accidentally call legacy progress RPCs'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', true);
+
+select is(
+  (select pg_catalog.count(*) from public.clubs),
+  0::bigint,
+  'club discovery does not broaden direct club-table access'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from public.list_discoverable_clubs()
+    where name = 'RLS Club'
+  ),
+  1::bigint,
+  'signed-in non-members can discover directory-safe club projections'
+);
+
+select is(
+  (
+    select viewer_role::text
+    from public.list_discoverable_clubs()
+    where name = 'RLS Club'
+  ),
+  null::text,
+  'directory projection does not invent membership for an outsider'
+);
+
+select throws_like(
+  $$ select pg_catalog.count(*) from public.club_join_requests $$,
+  '%permission denied%',
+  'applicants cannot read raw join-request rows'
+);
+
+create temp table test_outsider_application as
+select *
+from public.apply_to_club(
+  (select id from public.list_discoverable_clubs() where name = 'RLS Club')
+);
+
+select is(
+  (
+    select application_status::text
+    from public.list_discoverable_clubs()
+    where name = 'RLS Club'
+  ),
+  'pending',
+  'applicants see their own pending state through the directory projection'
+);
+
+select throws_like(
+  $$ select public.apply_to_club(
+       (select id from public.list_discoverable_clubs() where name = 'RLS Club')
+     ) $$,
+  '%application already pending%',
+  'duplicate pending applications are rejected atomically'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+
+select throws_like(
+  $$ select * from public.list_club_join_requests(
+       (select id from public.clubs where slug = 'rls-club')
+     ) $$,
+  '%only club owners and admins may review applications%',
+  'ordinary members cannot list club applications'
+);
+
+select throws_like(
+  $$ select public.review_club_join_request(
+       (select id from test_outsider_application),
+       'approved'
+     ) $$,
+  '%only club owners and admins may review applications%',
+  'ordinary members cannot approve club applications'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+
+select is(
+  (
+    select display_name
+    from public.list_club_join_requests(
+      (select id from public.clubs where slug = 'rls-club')
+    )
+    where request_id = (select id from test_outsider_application)
+  ),
+  'Outsider',
+  'club owners can review the minimum applicant profile projection'
+);
+
+select throws_like(
+  $$ select public.review_club_join_request(
+       (select id from test_outsider_application),
+       'maybe'
+     ) $$,
+  '%review decision must be approved or rejected%',
+  'application review rejects unknown decisions'
+);
+
+select lives_ok(
+  $$ select public.review_club_join_request(
+       (select id from test_outsider_application),
+       'rejected'
+     ) $$,
+  'club owners can reject pending applications'
+);
+
+select throws_like(
+  $$ select public.review_club_join_request(
+       (select id from test_outsider_application),
+       'approved'
+     ) $$,
+  '%request is no longer pending%',
+  'reviewed applications cannot be reviewed twice'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', true);
+
+select is(
+  (
+    select application_status::text
+    from public.list_discoverable_clubs()
+    where name = 'RLS Club'
+  ),
+  'rejected',
+  'rejected applicants see a retryable directory state'
+);
+
+create temp table test_outsider_retry as
+select *
+from public.apply_to_club(
+  (select id from public.list_discoverable_clubs() where name = 'RLS Club')
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+
+select lives_ok(
+  $$ select public.review_club_join_request(
+       (select id from test_outsider_retry),
+       'approved'
+     ) $$,
+  'club owners can approve a retried application'
+);
+
+reset role;
+select is(
+  (
+    select role::text
+    from public.club_members
+    where club_id = (select id from public.clubs where slug = 'rls-club')
+      and user_id = '00000000-0000-0000-0000-000000000003'
+  ),
+  'member',
+  'approval creates membership in the same transaction'
+);
+
+select is(
+  (
+    select status::text
+    from public.club_join_requests
+    where id = (select id from test_outsider_retry)
+  ),
+  'approved',
+  'approval closes the pending request'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+select lives_ok(
+  $$ select public.set_club_member_role(
+       (select id from public.clubs where slug = 'rls-club'),
+       '00000000-0000-0000-0000-000000000002',
+       'admin'::public.club_role
+     ) $$,
+  'owner can prepare an admin reviewer'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', true);
+create temp table test_admin_application as
+select *
+from public.apply_to_club(
+  (select id from public.list_discoverable_clubs() where name = 'RLS Club')
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+select lives_ok(
+  $$ select public.review_club_join_request(
+       (select id from test_admin_application),
+       'approved'
+     ) $$,
+  'club admins can approve pending applications'
+);
+
+reset role;
+select is(
+  (
+    select role::text
+    from public.club_members
+    where club_id = (select id from public.clubs where slug = 'rls-club')
+      and user_id = '00000000-0000-0000-0000-000000000004'
+  ),
+  'member',
+  'admin approval creates ordinary membership'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from information_schema.table_privileges
+    where table_schema = 'public'
+      and table_name = 'club_join_requests'
+      and grantee in ('anon', 'authenticated')
+  ),
+  0::bigint,
+  'join-request storage has no direct browser table grants'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.apply_to_club(uuid)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.apply_to_club(uuid)',
+    'EXECUTE'
+  ),
+  'only authenticated users may execute the application RPC'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.ensure_profile(text,text,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.ensure_profile(text,text,text)',
+    'EXECUTE'
+  ),
+  'only authenticated users may execute the profile bootstrap RPC'
 );
 
 reset role;

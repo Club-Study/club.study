@@ -2,7 +2,9 @@ import { queryOptions } from "@tanstack/react-query";
 
 import {
   getClub,
+  listClubJoinRequests,
   listClubs,
+  listDiscoverableClubs,
   listInvites,
   listMembers,
 } from "@/features/clubs/api";
@@ -12,6 +14,13 @@ export function clubsQueryOptions(userId: string) {
   return queryOptions({
     queryKey: queryKeys.clubs.list(userId),
     queryFn: () => listClubs(userId),
+  });
+}
+
+export function clubDirectoryQueryOptions(userId: string) {
+  return queryOptions({
+    queryKey: queryKeys.clubs.directory(userId),
+    queryFn: listDiscoverableClubs,
   });
 }
 
@@ -33,5 +42,12 @@ export function invitesQueryOptions(clubId: string) {
   return queryOptions({
     queryKey: queryKeys.clubs.invites(clubId),
     queryFn: () => listInvites(clubId),
+  });
+}
+
+export function joinRequestsQueryOptions(clubId: string) {
+  return queryOptions({
+    queryKey: queryKeys.clubs.applications(clubId),
+    queryFn: () => listClubJoinRequests(clubId),
   });
 }

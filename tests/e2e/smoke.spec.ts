@@ -35,6 +35,7 @@ const admin = createClient<Database>(supabaseUrl, publishableKey, {
 });
 
 const usersToDelete: string[] = [];
+const clubsToDelete: string[] = [];
 
 function assertLocalSupabaseUrl(value: string) {
   const url = new URL(value);
@@ -49,9 +50,19 @@ function assertLocalSupabaseUrl(value: string) {
 }
 
 test.afterAll(async () => {
-  await Promise.all(
-    usersToDelete.map((userId) => admin.auth.admin.deleteUser(userId)),
-  );
+  if (clubsToDelete.length) {
+    const { error } = await admin.from("clubs").delete().in("id", clubsToDelete);
+    if (error) {
+      throw error;
+    }
+  }
+
+  for (const userId of usersToDelete) {
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) {
+      throw error;
+    }
+  }
 });
 
 test("sign-in shell renders", async ({ page }) => {
@@ -136,8 +147,34 @@ test("authenticated launch loop works", async ({ browser, page }) => {
 
   await expect(page.getByRole("heading", { name: clubName })).toBeVisible();
   const clubId = getClubIdFromUrl(page.url());
+  clubsToDelete.push(clubId);
 
+  const applicantPrefix = `applicant-${testId}`;
+  const applicantName = applicantPrefix.replace(/-/g, " ");
+  const applicantPage = await signedInPage(browser, applicantPrefix);
+  await applicantPage.goto("/app/clubs");
+  await applicantPage
+    .getByRole("button", { name: `Apply to ${clubName}` })
+    .click();
+  await expect(
+    applicantPage.getByRole("button", {
+      name: `Application pending for ${clubName}`,
+    }),
+  ).toBeDisabled();
   await page.getByRole("link", { name: "Members" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await expect(page.getByText(applicantName, { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: `Approve ${applicantName}` })
+    .click();
+  await expect(page.getByText("No pending applications.")).toBeVisible();
+
+  await applicantPage.reload();
+  await expect(
+    applicantPage.getByRole("heading", { name: clubName }),
+  ).toBeVisible();
+  await applicantPage.context().close();
+
   await page.getByRole("button", { name: "Create invite" }).click();
   const inviteInput = page.locator("input[readonly]").first();
   await expect(inviteInput).toHaveValue(/\/invites\//);
@@ -184,7 +221,7 @@ test("authenticated launch loop works", async ({ browser, page }) => {
   await page.getByRole("button", { name: "Save progress" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(
-    page.getByText("1/2 read · 10 of 10 pages", { exact: true }),
+    page.getByText("1/3 read · 10 of 10 pages", { exact: true }),
   ).toBeVisible();
 
   await page.getByPlaceholder("Add a comment").fill("Ready for discussion.");

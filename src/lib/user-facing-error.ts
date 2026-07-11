@@ -16,6 +16,8 @@ export type UserFacingErrorOperation =
   | "create-club"
   | "update-club"
   | "invite"
+  | "club-application"
+  | "club-application-review"
   | "member-management"
   | "schedule-paper"
   | "add-personal-paper"
@@ -96,6 +98,20 @@ export function getUserFacingError(
     return { kind: "not-found", message: "That item could not be found." };
   }
 
+  if (
+    operation === "club-application" &&
+    /application already pending/.test(message)
+  ) {
+    return conflictForOperation(operation);
+  }
+
+  if (
+    operation === "club-application-review" &&
+    /request is no longer pending/.test(message)
+  ) {
+    return conflictForOperation(operation);
+  }
+
   if (code === "23505" || /already (?:exists|a member)/.test(message)) {
     return conflictForOperation(operation);
   }
@@ -144,6 +160,20 @@ function conflictForOperation(
     return {
       kind: "duplicate-personal-paper",
       message: "This paper is already in your papers.",
+    };
+  }
+
+  if (operation === "club-application") {
+    return {
+      kind: "conflict",
+      message: "You already have a pending application for this club.",
+    };
+  }
+
+  if (operation === "club-application-review") {
+    return {
+      kind: "conflict",
+      message: "This application has already been reviewed.",
     };
   }
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  CheckIcon,
   CopyIcon,
   CrownIcon,
   LinkIcon,
@@ -9,6 +10,7 @@ import {
   RotateCcwIcon,
   ShieldCheckIcon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,14 +23,18 @@ import {
   createInviteLink,
   isClubManagerRole,
   leaveClub,
+  reviewClubJoinRequest,
   revokeInviteLink,
   setClubMemberRole,
   transferClubOwnership,
   type ClubMember,
+  type ClubJoinRequestDecision,
+  type ClubJoinRequestListItem,
   type ClubRole,
 } from "@/features/clubs/api";
 import {
   invitesQueryOptions,
+  joinRequestsQueryOptions,
   membersQueryOptions,
 } from "@/features/clubs/queries";
 import { buildAppUrl } from "@/lib/appUrl";
@@ -76,6 +82,10 @@ export function MembersPage({ clubId }: { clubId: string }) {
   const isLastMember = members.data?.length === 1;
   const invites = useQuery({
     ...invitesQueryOptions(clubId),
+    enabled: isManager,
+  });
+  const applications = useQuery({
+    ...joinRequestsQueryOptions(clubId),
     enabled: isManager,
   });
   const pendingInvite = invites.data?.find((invite) => invite.status === "pending");
@@ -142,6 +152,46 @@ export function MembersPage({ clubId }: { clubId: string }) {
         ),
       ),
   });
+  const reviewApplication = useMutation({
+    mutationFn: ({
+      requestId,
+      decision,
+    }: {
+      requestId: string;
+      decision: ClubJoinRequestDecision;
+    }) => reviewClubJoinRequest({ requestId, decision }),
+    onSuccess: async (request) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.clubs.applications(clubId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.clubs.members(clubId),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.clubs.all }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.schedule.progress(clubId),
+        }),
+      ]);
+      toast.success(
+        request.status === "approved"
+          ? "Application approved"
+          : "Application rejected",
+      );
+    },
+    onError: async (error) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.clubs.applications(clubId),
+      });
+      toast.error(
+        toUserMessage(
+          error,
+          "club-application-review",
+          "Could not review the application.",
+        ),
+      );
+    },
+  });
   const leave = useMutation({
     mutationFn: () => leaveClub(clubId),
     onSuccess: async (result) => {
@@ -170,7 +220,8 @@ export function MembersPage({ clubId }: { clubId: string }) {
       ),
   });
 
-  const queryError = members.error ?? currentUser.error ?? invites.error;
+  const queryError =
+    members.error ?? currentUser.error ?? invites.error ?? applications.error;
   if (queryError) {
     return (
       <QueryErrorNotice
@@ -303,6 +354,16 @@ export function MembersPage({ clubId }: { clubId: string }) {
         </div>
       ) : null}
 
+      {isManager ? (
+        <JoinApplicationsSection
+          applications={applications.data ?? []}
+          isPending={reviewApplication.isPending}
+          onReview={(requestId, decision) =>
+            reviewApplication.mutate({ requestId, decision })
+          }
+        />
+      ) : null}
+
       <Table className="table-fixed">
         <TableHeader>
           <TableRow>
@@ -369,6 +430,99 @@ export function MembersPage({ clubId }: { clubId: string }) {
           ))}
         </TableBody>
       </Table>
+    </section>
+  );
+}
+
+function JoinApplicationsSection({
+  applications,
+  isPending,
+  onReview,
+}: {
+  applications: ClubJoinRequestListItem[];
+  isPending: boolean;
+  onReview: (requestId: string, decision: ClubJoinRequestDecision) => void;
+}) {
+  return (
+    <section className="min-w-0 space-y-3" aria-labelledby="applications-title">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 id="applications-title" className="text-sm font-medium">
+            Applications
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Approve people before they can access club content.
+          </p>
+        </div>
+        {applications.length ? (
+          <Badge variant="secondary">
+            {applications.length} pending
+          </Badge>
+        ) : null}
+      </div>
+
+      {applications.length ? (
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          {applications.map((application) => (
+            <article
+              key={application.request_id}
+              className="flex min-w-0 flex-col rounded-lg border bg-muted/15 p-4"
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <PixelAvatar
+                  avatarId={application.avatar_id}
+                  color={application.avatar_color}
+                  label={application.display_name}
+                  className="size-9 shrink-0"
+                />
+                <div className="min-w-0">
+                  <h3
+                    className="truncate text-sm font-medium"
+                    title={application.display_name}
+                  >
+                    {application.display_name}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Applied {new Date(application.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3 line-clamp-3 min-h-10 text-sm leading-5 text-muted-foreground [overflow-wrap:anywhere]">
+                {application.bio?.trim() || "No bio provided."}
+              </p>
+
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  aria-label={`Reject ${application.display_name}`}
+                  onClick={() => onReview(application.request_id, "rejected")}
+                >
+                  <XIcon aria-hidden="true" className="size-4" />
+                  Reject
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={isPending}
+                  aria-label={`Approve ${application.display_name}`}
+                  onClick={() => onReview(application.request_id, "approved")}
+                >
+                  <CheckIcon aria-hidden="true" className="size-4" />
+                  Approve
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed px-4 py-5 text-sm text-muted-foreground">
+          No pending applications.
+        </p>
+      )}
     </section>
   );
 }

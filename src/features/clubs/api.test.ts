@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeClubListRow, type Club } from "@/features/clubs/api";
+import {
+  normalizeClubListRow,
+  normalizeDiscoverableClubRow,
+  type Club,
+} from "@/features/clubs/api";
 
 const club: Club = {
   id: "club-id",
@@ -61,4 +65,45 @@ describe("normalizeClubListRow", () => {
       }),
     ).toThrow();
   });
+});
+
+describe("normalizeDiscoverableClubRow", () => {
+  it("normalizes nullable viewer and application state", () => {
+    expect(
+      normalizeDiscoverableClubRow({
+        id: "club-id",
+        name: "Interpretability Reading Group",
+        description: null,
+        member_count: 3,
+        viewer_role: null,
+        application_status: "pending",
+        application_created_at: "2026-07-11T12:00:00.000Z",
+      }),
+    ).toEqual({
+      id: "club-id",
+      name: "Interpretability Reading Group",
+      description: null,
+      memberCount: 3,
+      viewerRole: null,
+      applicationStatus: "pending",
+      applicationCreatedAt: "2026-07-11T12:00:00.000Z",
+    });
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects invalid member count %s",
+    (memberCount) => {
+      expect(() =>
+        normalizeDiscoverableClubRow({
+          id: "club-id",
+          name: "Club",
+          description: null,
+          member_count: memberCount,
+          viewer_role: null,
+          application_status: null,
+          application_created_at: null,
+        }),
+      ).toThrow("invalid member count");
+    },
+  );
 });
