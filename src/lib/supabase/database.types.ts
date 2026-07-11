@@ -831,6 +831,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      ensure_profile: {
+        Args: {
+          p_avatar_color?: string
+          p_avatar_id?: string
+          p_display_name: string
+        }
+        Returns: {
+          avatar_color: string
+          avatar_id: string
+          bio: string | null
+          created_at: string
+          display_name: string
+          id: string
+          is_public: boolean
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_club_schedule_progress: {
         Args: { p_club_id: string }
         Returns: {

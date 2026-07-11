@@ -85,9 +85,15 @@ export type ProfileOverview = {
 
 export async function upsertProfileFromUser(user: User) {
   const values = profileValuesFromUser(user);
+  await ensureProfileFromUser(user);
   const { data, error } = await supabase
     .from("profiles")
-    .upsert(values, { onConflict: "id" })
+    .update({
+      display_name: values.display_name,
+      avatar_id: values.avatar_id,
+      avatar_color: values.avatar_color,
+    })
+    .eq("id", user.id)
     .select()
     .single();
 
@@ -100,17 +106,17 @@ export async function upsertProfileFromUser(user: User) {
 
 export async function ensureProfileFromUser(user: User) {
   const values = profileValuesFromUser(user);
-  const { data, error } = await supabase
-    .from("profiles")
-    .upsert(values, { onConflict: "id", ignoreDuplicates: true })
-    .select()
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("ensure_profile", {
+    p_display_name: values.display_name,
+    p_avatar_id: values.avatar_id,
+    p_avatar_color: values.avatar_color,
+  });
 
   if (error) {
     throw error;
   }
 
-  return data ?? getProfileById(user.id);
+  return data;
 }
 
 export async function getProfile(userId?: string) {
