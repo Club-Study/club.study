@@ -16,6 +16,7 @@ describe("arXiv Edge security contract", () => {
 
   it("uses explicit origins and bounded request/upstream bodies", () => {
     expect(edgeSource).not.toContain('"Access-Control-Allow-Origin": "*"');
+    expect(edgeSource).toContain('"https://cosearch.club"');
     expect(edgeSource).toContain("maxBodyBytes = 4_096");
     expect(edgeSource).toContain("maxArxivResponseBytes = 1_000_000");
     expect(edgeSource).toContain("requestBodyTimeoutMs = 5_000");

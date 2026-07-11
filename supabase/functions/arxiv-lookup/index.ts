@@ -1,11 +1,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2.110.0";
 
-const localOrigins = [
+const allowedApplicationOrigins = [
+  "https://cosearch.club",
   "http://127.0.0.1:5173",
   "http://localhost:5173",
 ] as const;
 const allowedOrigins = new Set([
-  ...localOrigins,
+  ...allowedApplicationOrigins,
   ...parseConfiguredOrigins(Deno.env.get("ALLOWED_ORIGINS")),
 ]);
 const maxBodyBytes = 4_096;
