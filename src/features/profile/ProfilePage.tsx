@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/auth/queries";
+import { ProfileActivityPanel } from "@/features/profile/components/ProfileActivityPanel";
 import { ProfileEditDialog } from "@/features/profile/components/ProfileEditDialog";
+import { ProfileIdentityRail } from "@/features/profile/components/ProfileIdentityRail";
 import { ProfileLoading } from "@/features/profile/components/ProfileLoading";
-import { ProfileSidebar } from "@/features/profile/components/ProfileSidebar";
-import { ProfileSummaryCard } from "@/features/profile/components/ProfileSummaryCard";
 import { RecentReadsCard } from "@/features/profile/components/RecentReadsCard";
 import { buildProfileActivity } from "@/features/profile/profileActivity";
 import {
@@ -64,38 +64,34 @@ export function ProfilePage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-14">
-      <ProfileSummaryCard
-        profile={profile.data}
-        activity={activity}
-        editControl={
-          <ProfileEditDialog
-            open={isEditing}
-            onOpenChange={setIsEditing}
-            profile={profile.data}
-            userEmail={user.data.email}
-            trigger={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="h-6 w-6 rounded-sm text-muted-foreground hover:bg-transparent hover:text-foreground"
-              >
-                <PencilIcon className="size-3.5" />
-                <span className="sr-only">Edit profile</span>
-              </Button>
-            }
-          />
-        }
-      />
-
-      <div className="grid min-w-0 gap-12 lg:grid-cols-[17rem_minmax(0,1fr)]">
-        <ProfileSidebar
+    <section className="mx-auto max-w-6xl">
+      <div className="grid min-w-0 gap-10 xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start xl:gap-12">
+        <ProfileIdentityRail
           profile={profile.data}
           overview={overview.data}
           activity={activity}
+          editControl={
+            <ProfileEditDialog
+              open={isEditing}
+              onOpenChange={setIsEditing}
+              profile={profile.data}
+              userEmail={user.data.email}
+              trigger={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Edit profile"
+                  className="rounded-sm text-muted-foreground hover:text-foreground"
+                >
+                  <PencilIcon aria-hidden="true" />
+                </Button>
+              }
+            />
+          }
         />
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-10">
+          <ProfileActivityPanel activity={activity} />
           <RecentReadsCard overview={overview.data} />
         </div>
       </div>

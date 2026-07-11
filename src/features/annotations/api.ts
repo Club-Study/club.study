@@ -147,18 +147,20 @@ export async function updatePaperAnnotationBody(
 }
 
 export async function softDeletePaperAnnotation(annotationId: string) {
-  const { data, error } = await supabase
-    .from("paper_annotations")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", annotationId)
-    .select(annotationSelect)
-    .single();
+  const { data, error } = await supabase.rpc(
+    "soft_delete_paper_annotation",
+    { p_annotation_id: annotationId },
+  );
 
   if (error) {
     throw error;
   }
 
-  return data as unknown as PaperAnnotationRow;
+  if (!data) {
+    throw new Error("Annotation was not deleted.");
+  }
+
+  return data;
 }
 
 export function getAnnotationKindColor(kind: AnnotationKind) {

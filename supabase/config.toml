@@ -144,6 +144,8 @@ max_indexes = 5
 # [storage.vector.buckets.documents-openai]
 
 [functions.arxiv-lookup]
+# The current gateway verifier only accepts legacy JWT-based API keys. The
+# function verifies the user access token with Auth before doing any work.
 verify_jwt = false
 
 [auth]
@@ -204,7 +206,7 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-enable_signup = true
+enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true

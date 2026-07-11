@@ -11,11 +11,17 @@ export function ContributionGraph({
   className?: string;
 }) {
   return (
-    <div className={cn("flex max-w-full justify-start overflow-hidden", className)}>
-      <div className="w-max max-w-full overflow-hidden">
+    <div
+      className={cn("max-w-full overflow-x-auto pb-1", className)}
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
+      <div className="w-max min-w-full">
         <div
-          className="grid gap-[var(--activity-gap,0.25rem)] [grid-template-columns:repeat(49,var(--activity-cell,0.875rem))]"
-          aria-label={label}
+          data-slot="contribution-grid"
+          className="grid justify-between gap-[var(--activity-gap,0.25rem)] [grid-template-columns:repeat(52,var(--activity-cell,0.875rem))]"
+          aria-hidden="true"
         >
           {cells.map((level, index) => (
             <span
@@ -27,7 +33,10 @@ export function ContributionGraph({
           ))}
         </div>
 
-        <div className="mt-2 flex items-center justify-end gap-1 overflow-hidden text-[10px] leading-3 text-muted-foreground">
+        <div
+          className="mt-2 flex items-center justify-end gap-1 text-[10px] leading-3 text-muted-foreground"
+          aria-hidden="true"
+        >
           <span>Less</span>
           {[0, 1, 2, 3, 4].map((level) => (
             <span

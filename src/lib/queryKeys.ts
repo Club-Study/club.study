@@ -14,13 +14,26 @@ export const queryKeys = {
   },
   clubs: {
     all: ["clubs"] as const,
+    list: (userId: string) => ["clubs", "list", userId] as const,
     detail: (clubId: string) => ["clubs", clubId] as const,
     members: (clubId: string) => ["clubs", clubId, "members"] as const,
     invites: (clubId: string) => ["clubs", clubId, "invites"] as const,
   },
   schedule: {
     dashboardRoot: scheduleDashboardRoot,
-    dashboard: (weekStart: string) => [...scheduleDashboardRoot, weekStart] as const,
+    dashboard: (
+      userId: string,
+      scope: "upcoming" | "past",
+      weekStart: string,
+      filters: { clubId: string | null; search: string },
+    ) =>
+      [
+        ...scheduleDashboardRoot,
+        userId,
+        scope,
+        weekStart,
+        { clubId: filters.clubId, search: filters.search },
+      ] as const,
     list: (clubId: string) => ["schedule", clubId] as const,
     detail: (clubId: string, scheduleId: string) =>
       ["schedule", clubId, "detail", scheduleId] as const,

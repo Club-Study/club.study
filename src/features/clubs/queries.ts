@@ -8,10 +8,12 @@ import {
 } from "@/features/clubs/api";
 import { queryKeys } from "@/lib/queryKeys";
 
-export const clubsQueryOptions = queryOptions({
-  queryKey: queryKeys.clubs.all,
-  queryFn: listClubs,
-});
+export function clubsQueryOptions(userId: string) {
+  return queryOptions({
+    queryKey: queryKeys.clubs.list(userId),
+    queryFn: () => listClubs(userId),
+  });
+}
 
 export function clubQueryOptions(clubId: string) {
   return queryOptions({

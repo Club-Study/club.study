@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { LogReadingSessionDialog } from "@/components/log-reading-session-dialog";
+import { QueryErrorNotice } from "@/components/query-error-notice";
 import { useCurrentUser } from "@/features/auth/queries";
 import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
@@ -14,9 +15,7 @@ import { scheduleProgressQueryOptions } from "@/features/schedule/queries";
 import {
   getSchedule,
   getScheduleById,
-  logScheduleReadingSession,
-  setSchedulePaperStatus,
-  updatePaperPageCount,
+  saveScheduleReadingProgress,
   type PaperStatus,
   type ScheduleWithPaper,
 } from "@/features/schedule/api";
@@ -28,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatOptionalDateLabel } from "@/lib/dates/week";
+import { normalizeEmbeddablePdfUrl, normalizeHttpUrl } from "@/lib/http-url";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 export function ScheduledPaperPage({
   clubId,
@@ -64,33 +65,12 @@ export function ScheduledPaperPage({
   const isManager = isClubManagerRole(currentMembership?.role);
   const rowProgress = progress.data?.find((row) => row.schedule_id === scheduleId);
   const hasReadStatus = rowProgress !== undefined;
-  const updateStatus = useMutation({
-    mutationFn: (status: PaperStatus) => setSchedulePaperStatus(scheduleId, status),
-    onSuccess: async () => {
-      const invalidations = [
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.schedule.dashboardRoot,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.profile.root,
-        }),
-      ];
-
-      if (effectiveClubId) {
-        invalidations.push(
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.schedule.progress(effectiveClubId),
-          }),
-        );
-      }
-
-      await Promise.all(invalidations);
-    },
-    onError: (error) => toast.error(error.message),
-  });
-  const updatePageCount = useMutation({
-    mutationFn: ({ paperId, pageCount }: { paperId: string; pageCount: number }) =>
-      updatePaperPageCount(paperId, pageCount),
+  const saveProgress = useMutation({
+    mutationFn: (values: {
+      currentPage: number;
+      totalPages: number;
+      status: PaperStatus;
+    }) => saveScheduleReadingProgress({ scheduleId, ...values }),
     onSuccess: async () => {
       const invalidations = [
         queryClient.invalidateQueries({
@@ -111,27 +91,6 @@ export function ScheduledPaperPage({
           queryClient.invalidateQueries({
             queryKey: queryKeys.schedule.list(effectiveClubId),
           }),
-        );
-      }
-
-      await Promise.all(invalidations);
-    },
-    onError: (error) => toast.error(error.message),
-  });
-  const logSession = useMutation({
-    mutationFn: (pages: number) => logScheduleReadingSession(scheduleId, pages),
-    onSuccess: async () => {
-      const invalidations = [
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.schedule.dashboardRoot,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.profile.root,
-        }),
-      ];
-
-      if (effectiveClubId) {
-        invalidations.push(
           queryClient.invalidateQueries({
             queryKey: queryKeys.schedule.progress(effectiveClubId),
           }),
@@ -140,11 +99,19 @@ export function ScheduledPaperPage({
 
       await Promise.all(invalidations);
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(
+          error,
+          "reading-progress",
+          "Could not save reading progress. Please try again.",
+        ),
+      ),
   });
   const paper = schedule.data?.papers;
   const embeddedPdfUrl = paper ? getEmbeddedPdfUrl(paper) : null;
   const browserPaperUrl = paper ? getBrowserPaperUrl(paper) : null;
+  const arxivAbstractUrl = paper ? safeHttpUrl(paper.abstract_url) : null;
   const readProgressLabel = `${rowProgress?.read_count ?? 0}/${
     rowProgress?.total_members ?? 0
   } read`;
@@ -166,30 +133,28 @@ export function ScheduledPaperPage({
       throw new Error("Read status is still loading.");
     }
 
-    if (paper.page_count !== values.totalPages) {
-      await updatePageCount.mutateAsync({
-        paperId: paper.id,
-        pageCount: values.totalPages,
-      });
-    }
-
-    const pagesToLog = values.currentPage - pagesRead;
-    if (pagesToLog > 0) {
-      await logSession.mutateAsync(pagesToLog);
-    }
-
-    const nextStatus =
-      values.currentPage === values.totalPages
-        ? "read"
-        : pagesToLog > 0 && values.status !== "read"
-          ? "reading"
-          : values.status;
-
-    if (nextStatus !== rowProgress.current_user_status) {
-      await updateStatus.mutateAsync(nextStatus);
-    }
-
+    await saveProgress.mutateAsync(values);
     toast.success("Reading progress updated");
+  }
+
+  if (schedule.error) {
+    return (
+      <QueryErrorNotice
+        error={schedule.error}
+        fallbackMessage="Could not load this paper. Please try again."
+      />
+    );
+  }
+
+  const relatedQueryError =
+    progress.error ?? members.error ?? currentUser.error;
+  if (relatedQueryError) {
+    return (
+      <QueryErrorNotice
+        error={relatedQueryError}
+        fallbackMessage="Could not load reading progress or club access. Please try again."
+      />
+    );
   }
 
   if (schedule.isLoading) {
@@ -234,9 +199,9 @@ export function ScheduledPaperPage({
           </ProfileLink>
         </p>
         <div className="flex flex-wrap gap-2">
-          {paper.source_type === "arxiv" && paper.abstract_url ? (
+          {paper.source_type === "arxiv" && arxivAbstractUrl ? (
             <Button asChild size="sm" variant="outline">
-              <a href={paper.abstract_url} target="_blank" rel="noreferrer">
+              <a href={arxivAbstractUrl} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
                 Open on arXiv
               </a>
@@ -265,9 +230,7 @@ export function ScheduledPaperPage({
             totalPages={paper.page_count}
             status={rowProgress?.current_user_status ?? "planned"}
             disabled={
-              logSession.isPending ||
-              updatePageCount.isPending ||
-              updateStatus.isPending ||
+              saveProgress.isPending ||
               progress.isLoading ||
               !hasReadStatus
             }
@@ -322,12 +285,14 @@ function getEmbeddedPdfUrl(paper: {
   pdf_url: string | null;
   external_url: string | null;
 }) {
-  if (paper.pdf_url) {
-    return paper.pdf_url;
+  const pdfUrl = safeEmbeddablePdfUrl(paper.pdf_url);
+  if (pdfUrl) {
+    return pdfUrl;
   }
 
-  if (paper.external_url && isProbablyPdfUrl(paper.external_url)) {
-    return paper.external_url;
+  const externalUrl = safeEmbeddablePdfUrl(paper.external_url);
+  if (externalUrl && isProbablyPdfUrl(externalUrl)) {
+    return externalUrl;
   }
 
   return null;
@@ -355,5 +320,33 @@ function getBrowserPaperUrl(paper: {
   external_url: string | null;
   abstract_url: string | null;
 }) {
-  return paper.pdf_url ?? paper.external_url ?? paper.abstract_url;
+  return (
+    safeHttpUrl(paper.pdf_url) ??
+    safeHttpUrl(paper.external_url) ??
+    safeHttpUrl(paper.abstract_url)
+  );
+}
+
+function safeHttpUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return normalizeHttpUrl(value);
+  } catch {
+    return null;
+  }
+}
+
+function safeEmbeddablePdfUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return normalizeEmbeddablePdfUrl(value);
+  } catch {
+    return null;
+  }
 }

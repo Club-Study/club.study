@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { updateClub, type Club } from "@/features/clubs/api";
 import { clubFormSchema, type ClubFormValues } from "@/features/clubs/schemas";
 import { queryKeys } from "@/lib/queryKeys";
+import { getUserFacingError } from "@/lib/user-facing-error";
 
 export function EditClubDialog({ club }: { club: Club }) {
   const queryClient = useQueryClient();
@@ -49,7 +50,24 @@ export function EditClubDialog({ club }: { club: Club }) {
       setOpen(false);
       toast.success("Club updated");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) => {
+      const userError = getUserFacingError(
+        error,
+        "update-club",
+        "Could not update the club. Please try again.",
+      );
+
+      if (userError.kind === "club-name-conflict") {
+        form.setError(
+          "name",
+          { type: "server", message: userError.message },
+          { shouldFocus: true },
+        );
+        return;
+      }
+
+      toast.error(userError.message);
+    },
   });
 
   return (

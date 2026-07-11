@@ -9,15 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PaperReader } from "@/features/annotations/PaperReader";
 import { useCurrentUser } from "@/features/auth/queries";
-import {
-  logPersonalPaperReadingSession,
-  setPersonalPaperStatus,
-} from "@/features/profile/api";
+import { savePersonalReadingProgress } from "@/features/profile/api";
 import { ProfileLoading } from "@/features/profile/components/ProfileLoading";
 import { profileOverviewQueryOptions } from "@/features/profile/queries";
-import { updatePaperPageCount, type PaperStatus } from "@/features/schedule/api";
+import type { PaperStatus } from "@/features/schedule/api";
 import { formatOptionalDateLabel } from "@/lib/dates/week";
+import { normalizeEmbeddablePdfUrl, normalizeHttpUrl } from "@/lib/http-url";
 import { queryKeys } from "@/lib/queryKeys";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 export function PersonalPaperPage({
   personalPaperId,
@@ -40,39 +39,33 @@ export function PersonalPaperPage({
   const paper = personalPaper?.papers;
   const embeddedPdfUrl = paper ? getEmbeddedPdfUrl(paper) : null;
   const browserPaperUrl = paper ? getBrowserPaperUrl(paper) : null;
-  const updateStatus = useMutation({
-    mutationFn: (status: PaperStatus) => {
+  const arxivAbstractUrl = paper ? safeHttpUrl(paper.abstract_url) : null;
+  const saveProgress = useMutation({
+    mutationFn: (values: {
+      currentPage: number;
+      totalPages: number;
+      status: PaperStatus;
+    }) => {
       if (!personalPaper) {
         throw new Error("Personal paper is still loading.");
       }
 
-      return setPersonalPaperStatus(personalPaper.id, status);
+      return savePersonalReadingProgress({
+        personalPaperId: personalPaper.id,
+        ...values,
+      });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.profile.root });
     },
-    onError: (error) => toast.error(error.message),
-  });
-  const updatePageCount = useMutation({
-    mutationFn: ({ paperId, pageCount }: { paperId: string; pageCount: number }) =>
-      updatePaperPageCount(paperId, pageCount),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.profile.root });
-    },
-    onError: (error) => toast.error(error.message),
-  });
-  const logSession = useMutation({
-    mutationFn: (pages: number) => {
-      if (!personalPaper) {
-        throw new Error("Personal paper is still loading.");
-      }
-
-      return logPersonalPaperReadingSession(personalPaper.id, pages);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.profile.root });
-    },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(
+          error,
+          "reading-progress",
+          "Could not save reading progress. Please try again.",
+        ),
+      ),
   });
 
   async function saveReadingProgress(values: {
@@ -84,29 +77,7 @@ export function PersonalPaperPage({
       throw new Error("Personal paper is still loading.");
     }
 
-    if (paper.page_count !== values.totalPages) {
-      await updatePageCount.mutateAsync({
-        paperId: paper.id,
-        pageCount: values.totalPages,
-      });
-    }
-
-    const pagesToLog = values.currentPage - pagesRead;
-    if (pagesToLog > 0) {
-      await logSession.mutateAsync(pagesToLog);
-    }
-
-    const nextStatus =
-      values.currentPage === values.totalPages
-        ? "read"
-        : pagesToLog > 0 && values.status !== "read"
-          ? "reading"
-          : values.status;
-
-    if (nextStatus !== personalPaper.status) {
-      await updateStatus.mutateAsync(nextStatus);
-    }
-
+    await saveProgress.mutateAsync(values);
     toast.success("Reading progress updated");
   }
 
@@ -146,9 +117,9 @@ export function PersonalPaperPage({
           {formatAuthors(paper.authors)}
         </p>
         <div className="flex flex-wrap gap-2">
-          {paper.source_type === "arxiv" && paper.abstract_url ? (
+          {paper.source_type === "arxiv" && arxivAbstractUrl ? (
             <Button asChild size="sm" variant="outline">
-              <a href={paper.abstract_url} target="_blank" rel="noreferrer">
+              <a href={arxivAbstractUrl} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
                 Open on arXiv
               </a>
@@ -176,11 +147,7 @@ export function PersonalPaperPage({
             currentPagesRead={pagesRead}
             totalPages={paper.page_count}
             status={personalPaper.status}
-            disabled={
-              logSession.isPending ||
-              updatePageCount.isPending ||
-              updateStatus.isPending
-            }
+            disabled={saveProgress.isPending}
             onSave={saveReadingProgress}
           />
         </div>
@@ -210,19 +177,14 @@ export function PersonalPaperPage({
 }
 
 function formatAuthors(authors: string[]) {
-  if (!Array.isArray(authors)) {
-    throw new Error("Paper authors must be an array.");
-  }
+  const names = Array.isArray(authors)
+    ? authors.filter(
+        (author): author is string =>
+          typeof author === "string" && author.trim().length > 0,
+      )
+    : [];
 
-  const names = authors.map((author) => {
-    if (typeof author !== "string") {
-      throw new Error("Paper authors must be strings.");
-    }
-
-    return author;
-  });
-
-  return names.join(", ");
+  return names.length > 0 ? names.join(", ") : "No authors listed";
 }
 
 function formatPageProgress(pagesRead: number, totalPages: number | null) {
@@ -241,12 +203,14 @@ function getEmbeddedPdfUrl(paper: {
   pdf_url: string | null;
   external_url: string | null;
 }) {
-  if (paper.pdf_url) {
-    return paper.pdf_url;
+  const pdfUrl = safeEmbeddablePdfUrl(paper.pdf_url);
+  if (pdfUrl) {
+    return pdfUrl;
   }
 
-  if (paper.external_url && isProbablyPdfUrl(paper.external_url)) {
-    return paper.external_url;
+  const externalUrl = safeEmbeddablePdfUrl(paper.external_url);
+  if (externalUrl && isProbablyPdfUrl(externalUrl)) {
+    return externalUrl;
   }
 
   return null;
@@ -262,5 +226,33 @@ function getBrowserPaperUrl(paper: {
   external_url: string | null;
   abstract_url: string | null;
 }) {
-  return paper.pdf_url ?? paper.external_url ?? paper.abstract_url;
+  return (
+    safeHttpUrl(paper.pdf_url) ??
+    safeHttpUrl(paper.external_url) ??
+    safeHttpUrl(paper.abstract_url)
+  );
+}
+
+function safeHttpUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return normalizeHttpUrl(value);
+  } catch {
+    return null;
+  }
+}
+
+function safeEmbeddablePdfUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return normalizeEmbeddablePdfUrl(value);
+  } catch {
+    return null;
+  }
 }

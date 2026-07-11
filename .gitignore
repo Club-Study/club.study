@@ -18,6 +18,7 @@ test-results
 .agents
 skills-lock.json
 .codex
+.superpowers/
 __pycache__/
 *.py[cod]
 .venv/

@@ -2,14 +2,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { LogReadingSessionDialog } from "@/components/log-reading-session-dialog";
+import { savePersonalReadingProgress } from "@/features/profile/api";
 import {
-  logPersonalPaperReadingSession,
-  setPersonalPaperStatus,
-} from "@/features/profile/api";
-import {
-  logScheduleReadingSession,
-  setSchedulePaperStatus,
-  updatePaperPageCount,
+  saveScheduleReadingProgress,
   type PaperStatus,
 } from "@/features/schedule/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -26,39 +21,34 @@ export type PaperLogTarget =
     };
 
 export function PaperLogControl({
-  paperId,
   pageCount,
   pagesRead,
   status,
   target,
 }: {
-  paperId: string;
   pageCount: number | null;
   pagesRead: number;
   status: PaperStatus;
   target: PaperLogTarget;
 }) {
   const queryClient = useQueryClient();
-  const updatePageCount = useMutation<unknown, Error, number>({
-    mutationFn: (totalPages: number) =>
-      updatePaperPageCount(paperId, totalPages),
-  });
-  const logSession = useMutation<unknown, Error, number>({
-    mutationFn: (pages: number) => {
+  const saveProgress = useMutation({
+    mutationFn: (values: {
+      currentPage: number;
+      totalPages: number;
+      status: PaperStatus;
+    }) => {
       if (target.kind === "personal") {
-        return logPersonalPaperReadingSession(target.personalPaperId, pages);
+        return savePersonalReadingProgress({
+          personalPaperId: target.personalPaperId,
+          ...values,
+        });
       }
 
-      return logScheduleReadingSession(target.scheduleId, pages);
-    },
-  });
-  const updateStatus = useMutation<unknown, Error, PaperStatus>({
-    mutationFn: (nextStatus: PaperStatus) => {
-      if (target.kind === "personal") {
-        return setPersonalPaperStatus(target.personalPaperId, nextStatus);
-      }
-
-      return setSchedulePaperStatus(target.scheduleId, nextStatus);
+      return saveScheduleReadingProgress({
+        scheduleId: target.scheduleId,
+        ...values,
+      });
     },
   });
 
@@ -67,31 +57,7 @@ export function PaperLogControl({
     totalPages: number;
     status: PaperStatus;
   }) {
-    if (pageCount !== values.totalPages) {
-      await updatePageCount.mutateAsync(values.totalPages);
-    }
-
-    const pagesToLog = values.currentPage - pagesRead;
-
-    if (pagesToLog < 0) {
-      throw new Error("Current page cannot be less than your logged page count.");
-    }
-
-    if (pagesToLog > 0) {
-      await logSession.mutateAsync(pagesToLog);
-    }
-
-    const nextStatus =
-      values.currentPage === values.totalPages
-        ? "read"
-        : pagesToLog > 0 && values.status !== "read"
-          ? "reading"
-          : values.status;
-
-    if (nextStatus !== status) {
-      await updateStatus.mutateAsync(nextStatus);
-    }
-
+    await saveProgress.mutateAsync(values);
     await invalidatePaperQueries(queryClient, target);
     toast.success("Reading progress updated");
   }
@@ -104,9 +70,7 @@ export function PaperLogControl({
       triggerLabel="Log"
       triggerSize="xs"
       triggerClassName="self-start text-muted-foreground"
-      disabled={
-        updatePageCount.isPending || logSession.isPending || updateStatus.isPending
-      }
+      disabled={saveProgress.isPending}
       onSave={saveReadingProgress}
     />
   );

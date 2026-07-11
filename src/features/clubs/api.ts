@@ -7,6 +7,16 @@ export type ClubMember = Database["public"]["Tables"]["club_members"]["Row"];
 export type ClubInvite = Database["public"]["Tables"]["club_invites"]["Row"];
 export type ClubRole = Database["public"]["Enums"]["club_role"];
 
+export type ClubListItem = Club & {
+  viewerRole: ClubRole;
+  memberCount: number;
+};
+
+type ClubListQueryRow = Club & {
+  viewer_membership: unknown;
+  member_count: unknown;
+};
+
 export type MemberWithProfile = ClubMember & {
   profiles: {
     id: string;
@@ -17,10 +27,13 @@ export type MemberWithProfile = ClubMember & {
   } | null;
 };
 
-export async function listClubs() {
+export async function listClubs(userId: string): Promise<ClubListItem[]> {
   const { data, error } = await supabase
     .from("clubs")
-    .select("*")
+    .select(
+      "*, viewer_membership:club_members!inner(user_id, role), member_count:club_members(count)",
+    )
+    .eq("viewer_membership.user_id", userId)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -31,7 +44,71 @@ export async function listClubs() {
     throw new Error("Clubs query returned no data.");
   }
 
-  return data;
+  return (data as unknown as ClubListQueryRow[]).map(normalizeClubListRow);
+}
+
+export function normalizeClubListRow(row: ClubListQueryRow): ClubListItem {
+  const viewerMembership = normalizeViewerMembership(row.viewer_membership);
+  const memberCount = normalizeMemberCount(row.member_count);
+
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    viewerRole: viewerMembership.role,
+    memberCount,
+  };
+}
+
+function normalizeViewerMembership(value: unknown): { role: ClubRole } {
+  if (!Array.isArray(value) || value.length !== 1) {
+    throw new Error(
+      "Club query must return exactly one viewer membership per club.",
+    );
+  }
+
+  const membership = value[0];
+  if (
+    !membership ||
+    typeof membership !== "object" ||
+    !("role" in membership) ||
+    !isClubRole(membership.role)
+  ) {
+    throw new Error("Club query returned an invalid viewer role.");
+  }
+
+  return { role: membership.role };
+}
+
+function normalizeMemberCount(value: unknown): number {
+  if (!Array.isArray(value) || value.length !== 1) {
+    throw new Error(
+      "Club query must return exactly one member-count aggregate per club.",
+    );
+  }
+
+  const aggregate = value[0];
+  if (
+    !aggregate ||
+    typeof aggregate !== "object" ||
+    !("count" in aggregate) ||
+    typeof aggregate.count !== "number" ||
+    !Number.isFinite(aggregate.count) ||
+    !Number.isInteger(aggregate.count) ||
+    aggregate.count < 0
+  ) {
+    throw new Error("Club query returned an invalid member count.");
+  }
+
+  return aggregate.count;
+}
+
+function isClubRole(value: unknown): value is ClubRole {
+  return value === "owner" || value === "admin" || value === "member";
 }
 
 export async function getClub(clubId: string) {
@@ -55,7 +132,7 @@ export async function createClub(values: {
   const { data, error } = await supabase.rpc("create_club", {
     p_name: values.name,
     p_slug: generatedClubSlug(values.name),
-    p_description: values.description,
+    p_description: values.description ?? undefined,
   });
 
   if (error) {
@@ -116,7 +193,9 @@ export async function listMembers(clubId: string) {
 export async function listInvites(clubId: string) {
   const { data, error } = await supabase
     .from("club_invites")
-    .select("*")
+    .select(
+      "id, club_id, status, created_by, expires_at, created_at, accepted_by, accepted_at",
+    )
     .eq("club_id", clubId)
     .order("created_at", { ascending: false });
 
