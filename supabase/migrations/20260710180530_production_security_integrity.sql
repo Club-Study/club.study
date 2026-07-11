@@ -182,6 +182,27 @@ set manual_scope = coalesce(
 )
 where p.source_type = 'manual'::public.paper_source_type;
 
+-- Preserve legacy clubs while making their display names globally unambiguous.
+-- The oldest spelling keeps the original name; later normalized duplicates get
+-- a deterministic UUID suffix that remains within the existing 120-char limit.
+with ranked_clubs as (
+  select
+    id,
+    pg_catalog.row_number() over (
+      partition by pg_catalog.lower(pg_catalog.btrim(name))
+      order by created_at, id
+    ) as normalized_rank
+  from public.clubs
+)
+update public.clubs c
+set
+  name = pg_catalog.left(pg_catalog.btrim(c.name), 80) ||
+    ' [' || c.id::text || ']',
+  updated_at = pg_catalog.now()
+from ranked_clubs r
+where r.id = c.id
+  and r.normalized_rank > 1;
+
 do $$
 begin
   if exists (
