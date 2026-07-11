@@ -29,6 +29,7 @@ import {
   pixelAvatarIds,
 } from "@/lib/pixel-avatars";
 import { queryKeys } from "@/lib/queryKeys";
+import { SafeUserError, toUserMessage } from "@/lib/user-facing-error";
 
 type ProfileFormValues = Pick<
   Profile,
@@ -69,7 +70,7 @@ export function ProfileEditDialog({
       const nextDisplayName = values.display_name.trim();
 
       if (!nextDisplayName) {
-        throw new Error("Display name is required.");
+        throw new SafeUserError("Display name is required.");
       }
 
       return updateProfile({
@@ -88,7 +89,10 @@ export function ProfileEditDialog({
       onOpenChange(false);
       toast.success("Profile updated");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "profile", "Could not update your profile."),
+      ),
   });
 
   return (

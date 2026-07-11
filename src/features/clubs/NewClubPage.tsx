@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { createClub } from "@/features/clubs/api";
 import { clubFormSchema, type ClubFormValues } from "@/features/clubs/schemas";
 import { queryKeys } from "@/lib/queryKeys";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +37,24 @@ export function NewClubPage() {
         params: { clubId: club.id },
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) => {
+      const userError = getUserFacingError(
+        error,
+        "create-club",
+        "Could not create the club. Please try again.",
+      );
+
+      if (userError.kind === "club-name-conflict") {
+        form.setError(
+          "name",
+          { type: "server", message: userError.message },
+          { shouldFocus: true },
+        );
+        return;
+      }
+
+      toast.error(userError.message);
+    },
   });
 
   return (

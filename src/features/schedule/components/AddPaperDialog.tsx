@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { KatexText } from "@/components/katex-text";
@@ -34,7 +34,9 @@ import {
   type Paper,
 } from "@/features/schedule/api";
 import { formatOptionalDateLabel, toDateInputValue } from "@/lib/dates/week";
+import { MAX_HTTP_URL_LENGTH, normalizeHttpUrl } from "@/lib/http-url";
 import { queryKeys } from "@/lib/queryKeys";
+import { SafeUserError, toUserMessage } from "@/lib/user-facing-error";
 
 type Mode = "library" | "arxiv" | "manual";
 
@@ -82,12 +84,15 @@ export function AddPaperDialog({ clubId }: { clubId?: string }) {
   const lookup = useMutation({
     mutationFn: () => lookupArxivMetadata(arxivInput),
     onSuccess: setMetadata,
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "lookup-paper", "Could not look up that arXiv paper."),
+      ),
   });
   const addArxiv = useMutation<unknown, Error>({
     mutationFn: () => {
       if (!metadata) {
-        throw new Error("Look up arXiv metadata first.");
+        throw new SafeUserError("Look up arXiv metadata first.");
       }
 
       const parsedDeadline = optionalDateInputValue(deadline);
@@ -103,17 +108,53 @@ export function AddPaperDialog({ clubId }: { clubId?: string }) {
       return addPersonalArxivPaper(metadata, parsedDeadline);
     },
     onSuccess: async () => closeAfterAdd(queryClient, clubId, setOpen, resetForm),
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(
+          error,
+          isClubMode ? "schedule-paper" : "add-personal-paper",
+          isClubMode
+            ? "Could not add the paper to this club."
+            : "Could not add the paper to your profile.",
+        ),
+      ),
   });
   const addManual = useMutation<unknown, Error>({
     mutationFn: () => {
+      const title = manualTitle.trim();
+      if (!title) {
+        throw new SafeUserError("Enter a paper title.");
+      }
+
+      if (title.length > 500) {
+        throw new SafeUserError("Paper title must be 500 characters or fewer.");
+      }
+
+      const authors = splitAuthors(manualAuthors);
+      if (authors.length > 100) {
+        throw new SafeUserError("Add at most 100 authors.");
+      }
+
+      if (authors.some((author) => author.length > 300)) {
+        throw new SafeUserError(
+          "Each author name must be 300 characters or fewer.",
+        );
+      }
+
+      const abstract = manualAbstract.trim();
+      if (abstract.length > 100_000) {
+        throw new SafeUserError(
+          "The abstract must be 100,000 characters or fewer.",
+        );
+      }
+
       const values = {
-        title: manualTitle.trim(),
-        authors: splitAuthors(manualAuthors),
-        abstract: manualAbstract.trim() || null,
+        title,
+        authors,
+        abstract: abstract || null,
         doi: null,
         license: null,
-        external_url: manualUrl.trim(),
+        external_url: normalizeHttpUrl(manualUrl),
       };
       const parsedDeadline = optionalDateInputValue(deadline);
 
@@ -128,18 +169,27 @@ export function AddPaperDialog({ clubId }: { clubId?: string }) {
       return addPersonalManualPaper(values, parsedDeadline);
     },
     onSuccess: async () => closeAfterAdd(queryClient, clubId, setOpen, resetForm),
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(
+          error,
+          isClubMode ? "schedule-paper" : "add-personal-paper",
+          isClubMode
+            ? "Could not add the paper to this club."
+            : "Could not add the paper to your profile.",
+        ),
+      ),
   });
   const addExisting = useMutation<unknown, Error>({
     mutationFn: () => {
       if (clubId === undefined) {
-        throw new Error("Existing papers can only be added to a club.");
+        throw new SafeUserError("Existing papers can only be added to a club.");
       }
 
       const paperId = selectedPaperId || libraryPapers[0]?.paperId;
 
       if (!paperId) {
-        throw new Error("Choose a paper from your lists.");
+        throw new SafeUserError("Choose a paper from your lists.");
       }
 
       return scheduleExistingPaper({
@@ -149,7 +199,14 @@ export function AddPaperDialog({ clubId }: { clubId?: string }) {
       });
     },
     onSuccess: async () => closeAfterAdd(queryClient, clubId, setOpen, resetForm),
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(
+          error,
+          "schedule-paper",
+          "Could not add the paper to this club.",
+        ),
+      ),
   });
 
   function resetForm() {
@@ -278,6 +335,8 @@ export function AddPaperDialog({ clubId }: { clubId?: string }) {
                 label="External URL"
                 value={manualUrl}
                 placeholder="https://example.com/paper"
+                type="url"
+                maxLength={MAX_HTTP_URL_LENGTH}
                 onChange={setManualUrl}
               />
               <div className="grid gap-2">
@@ -285,6 +344,7 @@ export function AddPaperDialog({ clubId }: { clubId?: string }) {
                 <Textarea
                   id="manual-abstract"
                   value={manualAbstract}
+                  maxLength={100_000}
                   rows={4}
                   onChange={(event) => setManualAbstract(event.target.value)}
                 />
@@ -345,11 +405,15 @@ function Field({
   label,
   value,
   placeholder,
+  type = "text",
+  maxLength,
   onChange,
 }: {
   label: string;
   value: string;
   placeholder?: string;
+  type?: ComponentProps<"input">["type"];
+  maxLength?: number;
   onChange: (value: string) => void;
 }) {
   const id = label.toLowerCase().replace(/\s+/g, "-");
@@ -358,8 +422,10 @@ function Field({
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
+        type={type}
         value={value}
         placeholder={placeholder}
+        maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
@@ -427,7 +493,7 @@ function optionalDateInputValue(value: string) {
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    throw new Error("Deadline must be a valid date.");
+    throw new SafeUserError("Deadline must be a valid date.");
   }
 
   const parsedDate = new Date(`${trimmed}T00:00:00.000Z`);
@@ -435,7 +501,7 @@ function optionalDateInputValue(value: string) {
     Number.isNaN(parsedDate.getTime()) ||
     toDateInputValue(parsedDate) !== trimmed
   ) {
-    throw new Error("Deadline must be a valid date.");
+    throw new SafeUserError("Deadline must be a valid date.");
   }
 
   return trimmed;

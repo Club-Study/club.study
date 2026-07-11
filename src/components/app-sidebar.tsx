@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 type NavItem = {
   label: string;
@@ -77,7 +78,11 @@ export function AppSidebar() {
                 await navigate({ to: "/sign-in", replace: true });
               } catch (error) {
                 toast.error(
-                  error instanceof Error ? error.message : "Sign out failed",
+                  toUserMessage(
+                    error,
+                    "auth",
+                    "Sign out failed. Please try again.",
+                  ),
                 );
               }
             }}

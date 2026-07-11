@@ -118,7 +118,7 @@ function Sidebar({
         data-slot="sidebar"
         data-state={open ? "expanded" : "collapsed"}
         className={cn(
-          "group/sidebar hidden min-h-dvh shrink-0 overflow-hidden border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col",
+          "group/sidebar sticky top-0 hidden h-dvh shrink-0 self-start overflow-hidden border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col",
           collapsible === "icon"
             ? open
               ? "w-(--sidebar-width)"

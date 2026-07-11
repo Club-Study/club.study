@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { functionInvocationError } from "@/lib/supabase/functionError";
+
+import { normalizeFeedSearch } from "@/features/dashboard/feed";
 
 type PaperRow = Database["public"]["Tables"]["papers"]["Row"];
 type ScheduleRow = Database["public"]["Tables"]["club_paper_schedule"]["Row"];
@@ -25,6 +28,17 @@ export type ScheduleWithPaper = Schedule & {
     avatar_id: string;
     avatar_color: string;
   } | null;
+};
+
+export type FeedScope = "upcoming" | "past";
+
+export type FeedFilters = {
+  clubId: string | null;
+  search: string;
+};
+
+export type DashboardFeedItem = ScheduleWithPaper & {
+  currentStatus: PaperStatus | null;
 };
 
 export type ScheduleProgress =
@@ -64,15 +78,52 @@ export async function listClubSchedule(clubId: string) {
   return (data as unknown as ScheduleWithPaperRaw[]).map(normalizeSchedule);
 }
 
-export async function listDashboardSchedule(fromWeekStart: string) {
-  const { data, error } = await supabase
+export async function listDashboardFeed({
+  userId,
+  scope,
+  currentWeekStart,
+  filters,
+}: {
+  userId: string;
+  scope: FeedScope;
+  currentWeekStart: string;
+  filters: FeedFilters;
+}) {
+  const search = normalizeFeedSearch(filters.search);
+  const papersRelation = search ? "papers!inner(*)" : "papers(*)";
+  const query = supabase
     .from("club_paper_schedule")
     .select(
-      "*, papers(*), clubs(id, name, slug), suggested_by:profiles!club_paper_schedule_created_by_fkey(id, display_name, avatar_id, avatar_color)",
-    )
-    .or(`week_start.gte.${fromWeekStart},week_start.is.null`)
-    .order("week_start", { ascending: true, nullsFirst: false })
+      `*, ${papersRelation}, clubs!inner(id, name, slug, club_members!inner(user_id)), suggested_by:profiles!club_paper_schedule_created_by_fkey(id, display_name, avatar_id, avatar_color), schedule_paper_statuses(status)`,
+    );
+
+  if (scope === "upcoming") {
+    query.or(
+      `week_start.gte.${currentWeekStart},week_start.is.null`,
+    );
+  } else {
+    query.lt("week_start", currentWeekStart);
+  }
+
+  if (filters.clubId) {
+    query.eq("club_id", filters.clubId);
+  }
+
+  query
+    .eq("clubs.club_members.user_id", userId)
+    .eq("schedule_paper_statuses.user_id", userId);
+
+  if (search) {
+    query.or(paperSearchFilter(search), { referencedTable: "papers" });
+  }
+
+  const { data, error } = await query
+    .order("week_start", {
+      ascending: scope === "upcoming",
+      nullsFirst: false,
+    })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: true })
     .limit(20);
 
   if (error) {
@@ -83,7 +134,9 @@ export async function listDashboardSchedule(fromWeekStart: string) {
     throw new Error("Dashboard schedule query returned no data.");
   }
 
-  return (data as unknown as ScheduleWithPaperRaw[]).map(normalizeSchedule);
+  return (data as unknown as DashboardFeedItemRaw[]).map(
+    normalizeDashboardFeedItem,
+  );
 }
 
 export async function getSchedule(clubId: string, scheduleId: string) {
@@ -139,12 +192,12 @@ export async function lookupArxivMetadata(input: string) {
   const { data, error } = await supabase.functions.invoke<ArxivMetadata>(
     "arxiv-lookup",
     {
-      body: { input },
+      body: { action: "lookup", input },
     },
   );
 
   if (error) {
-    throw error;
+    throw await functionInvocationError(error, "arXiv lookup failed.");
   }
 
   if (!data) {
@@ -159,22 +212,30 @@ export async function scheduleArxivPaper(values: {
   deadline: string | null;
   metadata: ArxivMetadata;
 }) {
-  const { data, error } = await supabase.rpc("schedule_arxiv_paper", {
-    p_club_id: values.clubId,
-    p_week_start: values.deadline,
-    p_arxiv_metadata: values.metadata as unknown as Json,
-    p_notes: null,
+  const { data, error } = await supabase.functions.invoke<{
+    schedule_id: string;
+  }>("arxiv-lookup", {
+    body: {
+      action: "schedule",
+      input: values.metadata.arxiv_id,
+      clubId: values.clubId,
+      deadline: values.deadline,
+      notes: null,
+    },
   });
 
   if (error) {
-    throw error;
+    throw await functionInvocationError(
+      error,
+      "Scheduled arXiv paper was not created.",
+    );
   }
 
-  if (!data) {
+  if (!data?.schedule_id) {
     throw new Error("Scheduled arXiv paper was not created.");
   }
 
-  return getSchedule(values.clubId, data.id);
+  return getSchedule(values.clubId, data.schedule_id);
 }
 
 export async function scheduleManualPaper(values: {
@@ -191,9 +252,8 @@ export async function scheduleManualPaper(values: {
 }) {
   const { data, error } = await supabase.rpc("schedule_manual_paper", {
     p_club_id: values.clubId,
-    p_week_start: values.deadline,
+    p_week_start: values.deadline ?? undefined,
     p_metadata: values.metadata as unknown as Json,
-    p_notes: null,
   });
 
   if (error) {
@@ -215,8 +275,7 @@ export async function scheduleExistingPaper(values: {
   const { data, error } = await supabase.rpc("schedule_existing_paper", {
     p_club_id: values.clubId,
     p_paper_id: values.paperId,
-    p_week_start: values.deadline,
-    p_notes: null,
+    p_week_start: values.deadline ?? undefined,
   });
 
   if (error) {
@@ -236,7 +295,7 @@ export async function updateScheduledPaperDeadline(values: {
 }) {
   const { data, error } = await supabase.rpc("update_scheduled_paper_deadline", {
     p_schedule_id: values.scheduleId,
-    p_week_start: values.deadline,
+    p_week_start: values.deadline ?? undefined,
   });
 
   if (error) {
@@ -266,39 +325,17 @@ export async function deleteScheduledPaper(scheduleId: string) {
   return data;
 }
 
-export async function toggleReadStatus(scheduleId: string, read: boolean) {
-  const { data, error } = await supabase.rpc("toggle_read_status", {
-    p_schedule_id: scheduleId,
-    p_read: read,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return oneStatusResult(data, "Schedule read status was not updated.");
-}
-
-export async function setSchedulePaperStatus(
-  scheduleId: string,
-  status: PaperStatus,
-) {
-  const { data, error } = await supabase.rpc("set_schedule_paper_status", {
-    p_schedule_id: scheduleId,
-    p_status: status,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return oneStatusResult(data, "Schedule paper status was not updated.");
-}
-
-export async function updatePaperPageCount(paperId: string, pageCount: number) {
-  const { data, error } = await supabase.rpc("update_paper_page_count", {
-    p_paper_id: paperId,
-    p_page_count: pageCount,
+export async function saveScheduleReadingProgress(values: {
+  scheduleId: string;
+  currentPage: number;
+  totalPages: number;
+  status: PaperStatus;
+}) {
+  const { data, error } = await supabase.rpc("save_schedule_reading_progress", {
+    p_schedule_id: values.scheduleId,
+    p_current_page: values.currentPage,
+    p_total_pages: values.totalPages,
+    p_status: values.status,
   });
 
   if (error) {
@@ -306,40 +343,24 @@ export async function updatePaperPageCount(paperId: string, pageCount: number) {
   }
 
   if (!data) {
-    throw new Error("Paper page count was not updated.");
-  }
-
-  return normalizePaper(data);
-}
-
-export async function logScheduleReadingSession(
-  scheduleId: string,
-  pagesRead: number,
-) {
-  const { data, error } = await supabase.rpc("log_schedule_reading_session", {
-    p_schedule_id: scheduleId,
-    p_pages_read: pagesRead,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Schedule reading session was not logged.");
+    throw new Error("Schedule reading progress was not saved.");
   }
 
   return data;
 }
 
 type ScheduleWithPaperRaw = ScheduleRow & {
+  page_count?: number | null;
   papers: PaperRow | null;
   clubs?: ScheduleWithPaper["clubs"];
   suggested_by?: ScheduleWithPaper["suggested_by"];
 };
 
-type ScheduleStatusResult =
-  Database["public"]["Functions"]["set_schedule_paper_status"]["Returns"][number];
+type DashboardFeedItemRaw = ScheduleWithPaperRaw & {
+  schedule_paper_statuses?: Array<{
+    status: PaperStatus;
+  }> | null;
+};
 
 function normalizeSchedule(row: ScheduleWithPaperRaw): ScheduleWithPaper {
   if (!row.papers) {
@@ -348,28 +369,47 @@ function normalizeSchedule(row: ScheduleWithPaperRaw): ScheduleWithPaper {
 
   return {
     ...row,
-    papers: normalizePaper(row.papers),
+    papers: normalizePaper(row.papers, row.page_count),
   };
 }
 
-function normalizePaper(row: PaperRow): Paper {
+function normalizeDashboardFeedItem(
+  row: DashboardFeedItemRaw,
+): DashboardFeedItem {
+  const { schedule_paper_statuses: statuses, ...schedule } = row;
+
+  return {
+    ...normalizeSchedule(schedule),
+    currentStatus: statuses?.at(0)?.status ?? null,
+  };
+}
+
+function paperSearchFilter(search: string) {
+  const pattern = quotePostgrestValue(
+    `%${escapeLikePattern(search)}%`,
+  );
+
+  return `title.ilike.${pattern},abstract.ilike.${pattern}`;
+}
+
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
+function quotePostgrestValue(value: string) {
+  return `"${value.replace(/[\\"]/g, "\\$&")}"`;
+}
+
+function normalizePaper(
+  row: PaperRow,
+  contextPageCount?: number | null,
+): Paper {
   return {
     ...row,
+    page_count:
+      contextPageCount === undefined ? row.page_count : contextPageCount,
     authors: stringArray(row.authors, `paper "${row.id}" authors`),
   };
-}
-
-function oneStatusResult(
-  data: ScheduleStatusResult[] | null,
-  emptyMessage: string,
-) {
-  const row = data?.at(0);
-
-  if (!row) {
-    throw new Error(emptyMessage);
-  }
-
-  return row;
 }
 
 function stringArray(value: Json, label: string) {

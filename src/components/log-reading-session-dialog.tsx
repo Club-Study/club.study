@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PaperStatus } from "@/features/schedule/api";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 const paperStatusOptions: Array<{ value: PaperStatus; label: string }> = [
   { value: "planned", label: "Planned" },
@@ -87,6 +88,11 @@ export function LogReadingSessionDialog({
       return;
     }
 
+    if (parsedTotalPages > 100_000) {
+      setError("Total pages cannot exceed 100,000.");
+      return;
+    }
+
     if (parsedCurrentPage > parsedTotalPages) {
       setError("Current page cannot exceed total pages.");
       return;
@@ -94,6 +100,13 @@ export function LogReadingSessionDialog({
 
     if (selectedStatus === "read" && parsedCurrentPage !== parsedTotalPages) {
       setError("Current page must equal total pages to mark the paper read.");
+      return;
+    }
+
+    if (selectedStatus === "planned" && parsedCurrentPage > 0) {
+      setError(
+        "Planned papers cannot have logged pages. Choose Reading or set current page to 0.",
+      );
       return;
     }
 
@@ -117,7 +130,13 @@ export function LogReadingSessionDialog({
         throw submitError;
       }
 
-      setError(submitError.message);
+      setError(
+        toUserMessage(
+          submitError,
+          "reading-progress",
+          "Could not save reading progress. Please try again.",
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -171,6 +190,7 @@ export function LogReadingSessionDialog({
                 inputMode="numeric"
                 type="number"
                 min={1}
+                max={100_000}
                 step={1}
                 value={totalPageCount}
                 onChange={(event) => {

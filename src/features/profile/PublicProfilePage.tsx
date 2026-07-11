@@ -5,9 +5,9 @@ import { useMemo } from "react";
 import { KatexText } from "@/components/katex-text";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { useCurrentUser } from "@/features/auth/queries";
+import { ProfileActivityPanel } from "@/features/profile/components/ProfileActivityPanel";
+import { ProfileIdentityRail } from "@/features/profile/components/ProfileIdentityRail";
 import { ProfileLoading } from "@/features/profile/components/ProfileLoading";
-import { ProfileSidebar } from "@/features/profile/components/ProfileSidebar";
-import { ProfileSummaryCard } from "@/features/profile/components/ProfileSummaryCard";
 import { RecentReadsCard } from "@/features/profile/components/RecentReadsCard";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { buildProfileActivity } from "@/features/profile/profileActivity";
@@ -91,19 +91,15 @@ export function PublicProfilePage({ userId }: { userId: string }) {
 
   if (profile.data.is_public && overview.data && activity) {
     return (
-      <section className="mx-auto max-w-6xl space-y-14">
-        <ProfileSummaryCard
-          profile={profile.data}
-          activity={activity}
-        />
-
-        <div className="grid min-w-0 gap-12 lg:grid-cols-[17rem_minmax(0,1fr)]">
-          <ProfileSidebar
+      <section className="mx-auto max-w-6xl">
+        <div className="grid min-w-0 gap-10 xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start xl:gap-12">
+          <ProfileIdentityRail
             profile={profile.data}
             overview={overview.data}
             activity={activity}
           />
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-10">
+            <ProfileActivityPanel activity={activity} />
             <RecentReadsCard overview={overview.data} readOnly />
           </div>
         </div>
@@ -126,9 +122,9 @@ export function PublicProfilePage({ userId }: { userId: string }) {
         />
         <div className="min-w-0 space-y-4">
           <div>
-            <h2 className="truncate text-2xl font-semibold leading-tight">
+            <h1 className="truncate text-2xl font-semibold leading-tight">
               {profile.data.display_name}
-            </h2>
+            </h1>
           </div>
           {profile.data.bio ? (
             <KatexText

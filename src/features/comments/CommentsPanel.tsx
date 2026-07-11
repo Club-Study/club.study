@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PixelAvatar } from "@/components/pixel-avatar";
+import { QueryErrorNotice } from "@/components/query-error-notice";
 import {
   createComment,
   softDeleteComment,
@@ -16,6 +17,7 @@ import { isClubManagerRole } from "@/features/clubs/api";
 import { membersQueryOptions } from "@/features/clubs/queries";
 import { ProfileLink } from "@/features/profile/components/ProfileLink";
 import { queryKeys } from "@/lib/queryKeys";
+import { toUserMessage } from "@/lib/user-facing-error";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { KatexText } from "@/components/katex-text";
@@ -53,8 +55,19 @@ export function CommentsPanel({
         queryKey: queryKeys.comments.list(scheduleId),
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(toUserMessage(error, "comment", "Could not add the comment.")),
   });
+
+  const queryError = comments.error ?? members.error ?? user.error;
+  if (queryError) {
+    return (
+      <QueryErrorNotice
+        error={queryError}
+        fallbackMessage="Could not load comments. Please try again."
+      />
+    );
+  }
 
   return (
     <section className="space-y-4">
@@ -124,7 +137,10 @@ function CommentItem({
         queryKey: queryKeys.comments.list(scheduleId),
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "comment", "Could not update the comment."),
+      ),
   });
   const remove = useMutation({
     mutationFn: () => softDeleteComment(comment.id),
@@ -133,7 +149,10 @@ function CommentItem({
         queryKey: queryKeys.comments.list(scheduleId),
       });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(
+        toUserMessage(error, "comment", "Could not delete the comment."),
+      ),
   });
 
   return (

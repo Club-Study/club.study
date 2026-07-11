@@ -8,20 +8,23 @@ import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/queries";
+import { safeAppRedirect } from "@/lib/safe-redirect";
+import { toUserMessage } from "@/lib/user-facing-error";
 
 const redirectStorageKey = "club.study.redirectAfterSignIn";
 
 export function SignInPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/sign-in" });
-  const redirect = safeRedirect(search.redirect);
+  const redirect = safeAppRedirect(search.redirect);
   const currentUser = useCurrentUser();
   const signIn = useMutation({
     mutationFn: async () => {
       window.localStorage.setItem(redirectStorageKey, redirect);
       await signInWithGoogle(`${window.location.origin}/auth/callback`);
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(toUserMessage(error, "auth", "Could not start sign in.")),
   });
 
   useEffect(() => {
@@ -55,13 +58,9 @@ export function SignInPage() {
 }
 
 export function getStoredRedirect() {
-  return safeRedirect(window.localStorage.getItem(redirectStorageKey));
+  return safeAppRedirect(window.localStorage.getItem(redirectStorageKey));
 }
 
 export function clearStoredRedirect() {
   window.localStorage.removeItem(redirectStorageKey);
-}
-
-function safeRedirect(value: unknown) {
-  return typeof value === "string" && value.startsWith("/") ? value : "/app";
 }

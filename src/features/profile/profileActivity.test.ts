@@ -13,6 +13,18 @@ import {
 } from "@/features/profile/profileActivity";
 
 describe("profile activity", () => {
+  it("builds a complete 52-week contribution window", () => {
+    const overview: ProfileOverview = {
+      memberships: [],
+      personalPapers: [],
+      readingLogs: [],
+      readingSessions: [],
+      scheduledPapers: [],
+    };
+
+    expect(buildProfileActivity(overview).contributionCells).toHaveLength(52 * 7);
+  });
+
   it("buckets papers by explicit read status and logged sessions", () => {
     const readSchedule = scheduledPaper("read", "2026-06-22", "read");
     const readingSchedule = scheduledPaper("started", "2026-07-06", "reading");
@@ -152,6 +164,7 @@ function personalPaper(
       abstract_url: null,
       pdf_url: null,
       external_url: "https://example.com/paper",
+      manual_scope: "user:00000000-0000-0000-0000-000000000001",
       page_count: null,
       published_at: null,
       source_updated_at: null,

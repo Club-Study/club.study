@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { KatexText } from "@/components/katex-text";
+import { PixelAvatar } from "@/components/pixel-avatar";
+import { Separator } from "@/components/ui/separator";
 import type {
   Profile,
   ProfileMembership,
@@ -10,35 +12,46 @@ import type {
 import { truncateProfileBio } from "@/features/profile/profileBio";
 import type { ProfileActivity } from "@/features/profile/profileActivity";
 
-const CLUB_ROW_HEIGHT = 76;
+const CLUB_ROW_HEIGHT = 72;
 const CLUB_VISIBLE_ROWS = 5;
 const CLUB_OVERSCAN = 2;
 
-export function ProfileSidebar({
+export function ProfileIdentityRail({
   profile,
   overview,
   activity,
+  editControl,
 }: {
   profile: Profile;
   overview: ProfileOverview;
-  activity?: ProfileActivity;
+  activity: ProfileActivity;
+  editControl?: ReactNode;
 }) {
   const bio = truncateProfileBio(profile.bio);
 
   return (
-    <aside className="space-y-10">
-      {activity ? (
-        <section className="grid grid-cols-3">
-          <ProfileStat label="Reading" value={activity.readingCount} align="start" />
-          <ProfileStat label="Planned" value={activity.plannedCount} align="center" />
-          <ProfileStat label="Read" value={activity.readCount} align="end" />
-        </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="text-[11px] font-medium uppercase text-muted-foreground">
-          Bio
-        </h2>
+    <aside className="min-w-0 space-y-6">
+      <div className="min-w-0 space-y-3">
+        <div
+          data-slot="profile-identity-header"
+          className="inline-flex min-w-0 max-w-full flex-col items-center gap-6 align-top"
+        >
+          <PixelAvatar
+            avatarId={profile.avatar_id}
+            color={profile.avatar_color}
+            label={profile.display_name}
+            className="size-20 rounded-md border-border/70 bg-card xl:size-28"
+          />
+          <div
+            data-slot="profile-name-row"
+            className="flex min-w-0 max-w-full items-center gap-2"
+          >
+            <h1 className="min-w-0 truncate text-left text-2xl font-semibold leading-tight">
+              {profile.display_name}
+            </h1>
+            <div className="flex shrink-0 items-center">{editControl}</div>
+          </div>
+        </div>
         {bio ? (
           <KatexText
             text={bio}
@@ -47,10 +60,18 @@ export function ProfileSidebar({
         ) : (
           <p className="text-sm text-muted-foreground">No bio yet.</p>
         )}
-      </section>
+      </div>
 
-      <section className="space-y-3">
-        <h2 className="text-[11px] font-medium uppercase text-muted-foreground">
+      <dl className="grid grid-cols-3 gap-3" aria-label="Reading summary">
+        <ProfileStat label="Reading" value={activity.readingCount} />
+        <ProfileStat label="Planned" value={activity.plannedCount} />
+        <ProfileStat label="Read" value={activity.readCount} />
+      </dl>
+
+      <Separator className="bg-border/70" />
+
+      <section className="space-y-3" aria-labelledby="profile-clubs-heading">
+        <h2 id="profile-clubs-heading" className="text-sm font-semibold">
           Clubs
         </h2>
         <VirtualizedClubList memberships={overview.memberships} />
@@ -113,14 +134,14 @@ function ClubMembershipLink({
     <Link
       to="/app/clubs/$clubId/schedule"
       params={{ clubId: membership.club_id }}
-      className="absolute left-0 right-0 block h-[76px] rounded-sm px-2 py-2 transition-colors hover:bg-card/70"
+      className="absolute left-0 right-0 block h-[72px] rounded-sm px-2 py-2 outline-none transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
       style={{ transform: `translateY(${top}px)` }}
     >
       <div className="flex items-center justify-between gap-3">
         <span className="min-w-0 truncate text-sm font-medium">
           {membership.clubs.name}
         </span>
-        <span className="shrink-0 text-[11px] text-muted-foreground">
+        <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
           {membership.role}
         </span>
       </div>
@@ -133,31 +154,13 @@ function ClubMembershipLink({
   );
 }
 
-function ProfileStat({
-  label,
-  value,
-  align,
-}: {
-  label: string;
-  value: number;
-  align: "start" | "center" | "end";
-}) {
+function ProfileStat({ label, value }: { label: string; value: number }) {
   return (
-    <div
-      className={`flex min-w-0 ${
-        align === "center"
-          ? "justify-center"
-          : align === "end"
-            ? "justify-end"
-            : "justify-start"
-      }`}
-    >
-      <div className="min-w-0 text-left">
-        <div className="text-base font-semibold leading-none">{value}</div>
-        <div className="mt-1 truncate text-[10px] text-muted-foreground">
-          {label}
-        </div>
-      </div>
+    <div className="flex min-w-0 flex-col">
+      <dt className="order-2 mt-1 truncate text-[10px] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="order-1 text-base font-semibold leading-none">{value}</dd>
     </div>
   );
 }

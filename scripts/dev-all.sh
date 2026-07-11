@@ -29,4 +29,4 @@ if [[ "${1:-}" == "--restart" ]]; then
 fi
 
 supabase start
-npm run dev
+npm run dev -- --host 127.0.0.1
