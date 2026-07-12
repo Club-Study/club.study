@@ -149,6 +149,16 @@ test("authenticated launch loop works", async ({ browser, page }) => {
   const clubId = getClubIdFromUrl(page.url());
   clubsToDelete.push(clubId);
 
+  const emailUpdates = page.getByRole("switch", { name: "Email updates" });
+  await expect(emailUpdates).not.toBeChecked();
+  await emailUpdates.click();
+  await expect(emailUpdates).toBeChecked();
+  await expect(page.getByText("Email updates enabled")).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("switch", { name: "Email updates" }),
+  ).toBeChecked();
+
   const applicantPrefix = `applicant-${testId}`;
   const applicantName = applicantPrefix.replace(/-/g, " ");
   const applicantPage = await signedInPage(browser, applicantPrefix);

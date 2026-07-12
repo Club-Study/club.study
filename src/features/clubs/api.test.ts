@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  normalizeClubEmailSubscription,
   normalizeClubListRow,
   normalizeDiscoverableClubRow,
   type Club,
@@ -106,4 +107,30 @@ describe("normalizeDiscoverableClubRow", () => {
       ).toThrow("invalid member count");
     },
   );
+});
+
+describe("normalizeClubEmailSubscription", () => {
+  const expected = { clubId: "club-id", userId: "user-id" };
+
+  it("returns false when no subscription exists", () => {
+    expect(normalizeClubEmailSubscription(null, expected)).toBe(false);
+  });
+
+  it("returns true only for the expected member subscription", () => {
+    expect(
+      normalizeClubEmailSubscription(
+        { club_id: "club-id", user_id: "user-id" },
+        expected,
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    { club_id: "another-club", user_id: "user-id" },
+    { club_id: "club-id", user_id: "another-user" },
+  ])("rejects an unexpected subscription row %#", (row) => {
+    expect(() => normalizeClubEmailSubscription(row, expected)).toThrow(
+      "unexpected row",
+    );
+  });
 });

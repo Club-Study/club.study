@@ -33,5 +33,13 @@ describe("queryKeys", () => {
       "club-id",
       "applications",
     ]);
+    expect(
+      queryKeys.clubs.emailSubscription("club-id", "user-id"),
+    ).toEqual([
+      ...queryKeys.clubs.all,
+      "club-id",
+      "email-subscription",
+      "user-id",
+    ]);
   });
 });

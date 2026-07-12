@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { QueryErrorNotice } from "@/components/query-error-notice";
 import { useCurrentUser } from "@/features/auth/queries";
 import { isClubManagerRole } from "@/features/clubs/api";
+import { ClubEmailSubscriptionControl } from "@/features/clubs/ClubEmailSubscriptionControl";
 import { EditClubDialog } from "@/features/clubs/EditClubDialog";
 import {
   clubQueryOptions,
@@ -55,9 +56,13 @@ export function ClubShell({ clubId }: { clubId: string }) {
             </p>
           ) : null}
         </div>
-        {club.data && isManager ? (
-          <div className="shrink-0">
-            <EditClubDialog club={club.data} />
+        {club.data && currentMembership && currentUser.data ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <ClubEmailSubscriptionControl
+              clubId={clubId}
+              userId={currentUser.data.id}
+            />
+            {isManager ? <EditClubDialog club={club.data} /> : null}
           </div>
         ) : null}
       </div>

@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 
 import {
   getClub,
+  getClubEmailSubscription,
   listClubJoinRequests,
   listClubs,
   listDiscoverableClubs,
@@ -28,6 +29,16 @@ export function clubQueryOptions(clubId: string) {
   return queryOptions({
     queryKey: queryKeys.clubs.detail(clubId),
     queryFn: () => getClub(clubId),
+  });
+}
+
+export function clubEmailSubscriptionQueryOptions(
+  clubId: string,
+  userId: string,
+) {
+  return queryOptions({
+    queryKey: queryKeys.clubs.emailSubscription(clubId, userId),
+    queryFn: () => getClubEmailSubscription(clubId, userId),
   });
 }
 

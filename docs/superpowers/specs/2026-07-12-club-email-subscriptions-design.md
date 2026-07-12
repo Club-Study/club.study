@@ -23,10 +23,10 @@ Reminder processing begins at 09:00 `Europe/Oslo`. Papers without a deadline rec
 
 ## User experience
 
-The club header gains an `Email updates` control for members. Its states are:
+The club header gains an `Email updates` switch for members. Its states are:
 
-- `Subscribe`: email updates are off;
-- `Subscribed`: email updates are on; and
+- unchecked: email updates are off;
+- checked: email updates are on; and
 - a disabled pending state while the setting is saved.
 
 Changing the setting displays the existing toast success/error feedback. Unsubscribing immediately removes unsent notifications for that user and club. Removing a member from a club also removes the subscription automatically.
@@ -44,8 +44,8 @@ A locked-down outbox containing the subscriber ID, club ID, schedule ID, notific
 Each row has a unique deterministic deduplication key:
 
 - `scheduled:<schedule-id>:<user-id>`;
-- `reminder-3d:<schedule-id>:<user-id>:<deadline>`; or
-- `reminder-1d:<schedule-id>:<user-id>:<deadline>`.
+- `reminder_3d:<schedule-id>:<user-id>:<deadline>`; or
+- `reminder_1d:<schedule-id>:<user-id>:<deadline>`.
 
 This permits a new reminder when a deadline genuinely changes while preventing repeated cron runs from duplicating the same email.
 
@@ -66,11 +66,11 @@ A reminder whose deadline snapshot no longer matches the schedule is cancelled b
 
 A Supabase Edge Function named `club-email-notifications` is invoked every five minutes by Supabase Cron. It is not a browser endpoint and requires a constant-time comparison against an `x-cron-secret` value stored as an Edge Function secret.
 
-The function claims a small batch through service-role-only RPCs using `for update skip locked`. A stale processing lock becomes claimable again after ten minutes. Delivery uses Resend with an idempotency key derived from the outbox row ID.
+The function claims a small batch through service-role-only RPCs using `for update skip locked`. A stale processing lock becomes claimable again after ten minutes unless it was the fifth attempt, in which case it becomes terminally failed. Delivery uses Resend with an idempotency key derived from the outbox row ID.
 
 On success, the row records `sent_at` and the provider message ID. On a retryable error, it returns to pending with bounded exponential delay. Permanent validation errors are marked failed with a short, non-secret error summary. The function response reports counts only and never returns recipient data.
 
-Email content includes the club name, paper title, deadline when present, notification reason, and a canonical `https://cosearch.club/app/clubs/<club-id>/schedule/<schedule-id>` link. The sender is `cosearch <notifications@cosearch.club>` after the domain is verified in Resend.
+Email content includes the club name, paper title, deadline when present, notification reason, and a canonical `https://cosearch.club/app/papers/<schedule-id>` link. The sender is `cosearch <notifications@cosearch.club>` after the domain is verified in Resend.
 
 ## Configuration
 
