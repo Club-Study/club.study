@@ -1861,6 +1861,436 @@ select is(
   'admin approval creates ordinary membership'
 );
 
+reset role;
+select set_config(
+  'test.email_club_id',
+  (select id::text from public.clubs where slug = 'rls-club'),
+  false
+);
+set local role anon;
+select set_config('request.jwt.claim.sub', '', true);
+select throws_like(
+  $$ select count(*) from public.club_email_subscriptions $$,
+  '%permission denied%',
+  'signed-out users cannot inspect club email subscriptions'
+);
+select throws_like(
+  $$ select count(*) from public.club_email_notifications $$,
+  '%permission denied%',
+  'signed-out users cannot inspect the email outbox'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000005', true);
+select throws_like(
+  $$ insert into public.club_email_subscriptions (club_id, user_id)
+     values (
+       current_setting('test.email_club_id')::uuid,
+       '00000000-0000-0000-0000-000000000005'
+     ) $$,
+  '%row-level security%',
+  'non-members cannot subscribe to private club email'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+select lives_ok(
+  $$ insert into public.club_email_subscriptions (club_id, user_id)
+     select
+       id,
+       '00000000-0000-0000-0000-000000000002'
+     from public.clubs
+     where slug = 'rls-club' $$,
+  'club members can subscribe themselves to club email'
+);
+select throws_like(
+  $$ insert into public.club_email_subscriptions (club_id, user_id)
+     select
+       id,
+       '00000000-0000-0000-0000-000000000001'
+     from public.clubs
+     where slug = 'rls-club' $$,
+  '%row-level security%',
+  'members cannot subscribe another user'
+);
+select is(
+  (select count(*) from public.club_email_subscriptions),
+  1::bigint,
+  'subscribers can read their own subscription'
+);
+select throws_like(
+  $$ select count(*) from public.club_email_notifications $$,
+  '%permission denied%',
+  'subscribers cannot inspect delivery state or recipient data'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+select is(
+  (select count(*) from public.club_email_subscriptions),
+  0::bigint,
+  'club owners cannot inspect another member email subscription'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+create temp table test_email_schedule as
+select *
+from public.schedule_manual_paper(
+  (select id from public.clubs where slug = 'rls-club'),
+  '2026-08-10'::date,
+  jsonb_build_object(
+    'title', 'Email Notification Paper',
+    'authors', jsonb_build_array('N. Author'),
+    'external_url', 'https://example.com/email-notification-paper'
+  ),
+  null
+);
+
+reset role;
+grant select on test_email_schedule to authenticated, service_role;
+select is(
+  (
+    select count(*)
+    from public.club_email_notifications
+    where schedule_id = (select id from test_email_schedule)
+      and kind = 'scheduled'
+  ),
+  1::bigint,
+  'new schedules enqueue one email for each current subscriber'
+);
+select is(
+  (
+    select deadline_snapshot
+    from public.club_email_notifications
+    where schedule_id = (select id from test_email_schedule)
+      and kind = 'scheduled'
+  ),
+  null::date,
+  'new schedule deduplication does not depend on a deadline snapshot'
+);
+
+set local role service_role;
+select set_config('request.jwt.claim.role', 'service_role', true);
+select is(
+  public.queue_due_club_email_reminders('2026-08-07 06:59:00+00'),
+  0,
+  'reminders do not queue before 09:00 Europe/Oslo'
+);
+select is(
+  public.queue_due_club_email_reminders('2026-08-07 07:00:00+00'),
+  1,
+  'three-day reminders queue at 09:00 Europe/Oslo during daylight saving time'
+);
+select is(
+  public.queue_due_club_email_reminders('2026-08-07 07:05:00+00'),
+  0,
+  'repeat reminder scans are idempotent'
+);
+
+create temp table test_email_first_claim as
+select *
+from public.claim_club_email_notifications(
+  10,
+  '2026-08-07 07:05:00+00'
+);
+
+select is(
+  (select count(*) from test_email_first_claim),
+  2::bigint,
+  'delivery workers atomically claim the new-paper email and due reminder'
+);
+select is(
+  (
+    select recipient_email
+    from test_email_first_claim
+    where notification_kind = 'scheduled'
+  ),
+  'member@example.com',
+  'service-only claims resolve the confirmed auth email at delivery time'
+);
+select is(
+  (
+    select deadline
+    from test_email_first_claim
+    where notification_kind = 'scheduled'
+  ),
+  '2026-08-10'::date,
+  'new-paper email claims include the current deadline'
+);
+select is(
+  (
+    select paper_title
+    from test_email_first_claim
+    where notification_kind = 'scheduled'
+  ),
+  'Email Notification Paper',
+  'email claims include the private paper title only for the service worker'
+);
+
+select ok(
+  public.resolve_club_email_notification(
+    (
+      select notification_id
+      from test_email_first_claim
+      where notification_kind = 'scheduled'
+    ),
+    'sent',
+    'resend-message-1',
+    null,
+    null,
+    '2026-08-07 07:06:00+00'
+  ),
+  'workers can mark a claimed email as sent'
+);
+
+select ok(
+  public.resolve_club_email_notification(
+    (
+      select notification_id
+      from test_email_first_claim
+      where notification_kind = 'reminder_3d'
+    ),
+    'retry',
+    null,
+    'Temporary provider failure',
+    '2026-08-07 07:10:00+00',
+    '2026-08-07 07:06:00+00'
+  ),
+  'workers can schedule a bounded retry after a transient failure'
+);
+
+select is(
+  (
+    select count(*)
+    from public.claim_club_email_notifications(
+      10,
+      '2026-08-07 07:09:00+00'
+    )
+  ),
+  0::bigint,
+  'notifications cannot be reclaimed before their retry time'
+);
+
+create temp table test_email_retry_claim as
+select *
+from public.claim_club_email_notifications(
+  10,
+  '2026-08-07 07:10:00+00'
+);
+
+select is(
+  (select attempt_count from test_email_retry_claim),
+  2,
+  'reclaimed notifications increment their attempt count'
+);
+select ok(
+  public.resolve_club_email_notification(
+    (select notification_id from test_email_retry_claim),
+    'failed',
+    null,
+    'Permanent provider rejection',
+    null,
+    '2026-08-07 07:11:00+00'
+  ),
+  'workers can record a terminal delivery failure'
+);
+
+select is(
+  public.queue_due_club_email_reminders('2026-08-09 07:00:00+00'),
+  1,
+  'one-day reminders queue for the current deadline'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+select lives_ok(
+  $$ select public.update_scheduled_paper_deadline(
+       (select id from test_email_schedule),
+       '2026-08-12'::date
+     ) $$,
+  'club managers can move a deadline after a reminder was queued'
+);
+
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.role', 'service_role', true);
+select is(
+  public.queue_due_club_email_reminders('2026-08-09 07:01:00+00'),
+  1,
+  'a changed deadline receives a new deduplicated three-day reminder'
+);
+
+create temp table test_email_changed_deadline_claim as
+select *
+from public.claim_club_email_notifications(
+  10,
+  '2026-08-09 07:02:00+00'
+);
+
+reset role;
+select is(
+  (
+    select count(*)
+    from public.club_email_notifications
+    where schedule_id = (select id from test_email_schedule)
+      and kind = 'reminder_1d'
+      and deadline_snapshot = '2026-08-10'::date
+      and state = 'cancelled'
+  ),
+  1::bigint,
+  'stale reminders are cancelled when the deadline changes before delivery'
+);
+select is(
+  (
+    select deadline
+    from test_email_changed_deadline_claim
+    where notification_kind = 'reminder_3d'
+  ),
+  '2026-08-12'::date,
+  'the replacement reminder claims the changed deadline'
+);
+
+update public.club_email_notifications
+set
+  attempts = 5,
+  locked_at = '2026-08-09 07:02:00+00'
+where id = (
+  select notification_id
+  from test_email_changed_deadline_claim
+  where notification_kind = 'reminder_3d'
+);
+
+select is(
+  (
+    select count(*)
+    from public.claim_club_email_notifications(
+      10,
+      '2026-08-09 07:13:00+00'
+    )
+  ),
+  0::bigint,
+  'stale final-attempt notifications are not claimed a sixth time'
+);
+select is(
+  (
+    select state::text
+    from public.club_email_notifications
+    where id = (
+      select notification_id
+      from test_email_changed_deadline_claim
+      where notification_kind = 'reminder_3d'
+    )
+  ),
+  'failed',
+  'stale final-attempt notifications leave processing in a terminal state'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', true);
+select lives_ok(
+  $$ delete from public.club_email_subscriptions
+     where club_id = (select id from public.clubs where slug = 'rls-club')
+       and user_id = '00000000-0000-0000-0000-000000000002' $$,
+  'subscribers can turn club email off'
+);
+
+reset role;
+select is(
+  (
+    select count(*)
+    from public.club_email_notifications
+    where schedule_id = (select id from test_email_schedule)
+  ),
+  1::bigint,
+  'unsubscribing removes all unsent delivery rows while retaining sent history'
+);
+select is(
+  (
+    select state::text
+    from public.club_email_notifications
+    where schedule_id = (select id from test_email_schedule)
+  ),
+  'sent',
+  'unsubscribing retains only the sent audit row'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000004', true);
+select lives_ok(
+  $$ insert into public.club_email_subscriptions (club_id, user_id)
+     select
+       id,
+       '00000000-0000-0000-0000-000000000004'
+     from public.clubs
+     where slug = 'rls-club' $$,
+  'another ordinary member can subscribe'
+);
+select lives_ok(
+  $$ select public.leave_club(
+       (select id from public.clubs where slug = 'rls-club')
+     ) $$,
+  'subscribed ordinary members can still leave a club'
+);
+
+reset role;
+select is(
+  (
+    select count(*)
+    from public.club_email_subscriptions
+    where user_id = '00000000-0000-0000-0000-000000000004'
+  ),
+  0::bigint,
+  'removing club membership cascades the email subscription'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)
+    from information_schema.table_privileges
+    where table_schema = 'public'
+      and table_name = 'club_email_notifications'
+      and grantee in ('anon', 'authenticated')
+  ),
+  0::bigint,
+  'email outbox storage has no browser table grants'
+);
+
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.queue_due_club_email_reminders(timestamptz)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.claim_club_email_notifications(integer,timestamptz)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.resolve_club_email_notification(uuid,text,text,text,timestamptz,timestamptz)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.queue_due_club_email_reminders(timestamptz)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.claim_club_email_notifications(integer,timestamptz)',
+    'EXECUTE'
+  ),
+  'only the service role can execute email delivery RPCs'
+);
+
 select is(
   (
     select pg_catalog.count(*)

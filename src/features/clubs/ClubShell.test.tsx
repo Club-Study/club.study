@@ -40,6 +40,20 @@ vi.mock("@/features/clubs/EditClubDialog", () => ({
   EditClubDialog: () => <button type="button">Edit</button>,
 }));
 
+vi.mock("@/features/clubs/ClubEmailSubscriptionControl", () => ({
+  ClubEmailSubscriptionControl: ({
+    clubId,
+    userId,
+  }: {
+    clubId: string;
+    userId: string;
+  }) => (
+    <button type="button" aria-label={`Email updates ${clubId} ${userId}`}>
+      Email updates
+    </button>
+  ),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <a href="#club" className={className}>
@@ -70,6 +84,11 @@ describe("ClubShell", () => {
     expect(heading).toHaveClass("truncate");
     expect(heading).toHaveAttribute("title", testState.clubName);
     expect(description).toHaveClass("line-clamp-2", "[overflow-wrap:anywhere]");
+    expect(
+      screen.getByRole("button", {
+        name: "Email updates club-1 user-1",
+      }),
+    ).toBeVisible();
   });
 
   it("surfaces a safe club query error instead of a fallback club label", () => {

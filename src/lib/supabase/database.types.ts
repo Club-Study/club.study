@@ -34,6 +34,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      club_email_notifications: {
+        Row: {
+          attempts: number
+          available_at: string
+          club_id: string
+          created_at: string
+          deadline_snapshot: string | null
+          dedupe_key: string
+          id: string
+          kind: Database["public"]["Enums"]["club_email_notification_kind"]
+          last_error: string | null
+          locked_at: string | null
+          provider_message_id: string | null
+          schedule_id: string
+          sent_at: string | null
+          state: Database["public"]["Enums"]["club_email_notification_state"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          club_id: string
+          created_at?: string
+          deadline_snapshot?: string | null
+          dedupe_key: string
+          id?: string
+          kind: Database["public"]["Enums"]["club_email_notification_kind"]
+          last_error?: string | null
+          locked_at?: string | null
+          provider_message_id?: string | null
+          schedule_id: string
+          sent_at?: string | null
+          state?: Database["public"]["Enums"]["club_email_notification_state"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          club_id?: string
+          created_at?: string
+          deadline_snapshot?: string | null
+          dedupe_key?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["club_email_notification_kind"]
+          last_error?: string | null
+          locked_at?: string | null
+          provider_message_id?: string | null
+          schedule_id?: string
+          sent_at?: string | null
+          state?: Database["public"]["Enums"]["club_email_notification_state"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_email_notifications_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_email_notifications_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "club_paper_schedule"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_email_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_email_subscriptions: {
+        Row: {
+          club_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_email_subscriptions_club_id_user_id_fkey"
+            columns: ["club_id", "user_id"]
+            isOneToOne: true
+            referencedRelation: "club_members"
+            referencedColumns: ["club_id", "user_id"]
+          },
+        ]
+      }
       club_invites: {
         Row: {
           accepted_at: string | null
@@ -777,6 +882,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_club_email_notifications: {
+        Args: { p_limit?: number; p_now?: string }
+        Returns: {
+          attempt_count: number
+          club_id: string
+          club_name: string
+          deadline: string
+          notification_id: string
+          notification_kind: Database["public"]["Enums"]["club_email_notification_kind"]
+          paper_title: string
+          recipient_email: string
+          recipient_name: string
+          schedule_id: string
+        }[]
+      }
       consume_arxiv_rate_limit: {
         Args: { p_user_id: string }
         Returns: {
@@ -974,6 +1094,21 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      queue_due_club_email_reminders: {
+        Args: { p_now?: string }
+        Returns: number
+      }
+      resolve_club_email_notification: {
+        Args: {
+          p_error?: string
+          p_notification_id: string
+          p_now?: string
+          p_outcome: string
+          p_provider_message_id?: string
+          p_retry_at?: string
+        }
+        Returns: boolean
       }
       review_club_join_request: {
         Args: { p_decision: string; p_request_id: string }
@@ -1271,6 +1406,13 @@ export type Database = {
       }
     }
     Enums: {
+      club_email_notification_kind: "scheduled" | "reminder_3d" | "reminder_1d"
+      club_email_notification_state:
+        | "pending"
+        | "processing"
+        | "sent"
+        | "failed"
+        | "cancelled"
       club_join_request_status: "pending" | "approved" | "rejected"
       club_role: "owner" | "member" | "admin"
       invite_status: "pending" | "accepted" | "revoked" | "expired"
@@ -1407,6 +1549,14 @@ export const Constants = {
   },
   public: {
     Enums: {
+      club_email_notification_kind: ["scheduled", "reminder_3d", "reminder_1d"],
+      club_email_notification_state: [
+        "pending",
+        "processing",
+        "sent",
+        "failed",
+        "cancelled",
+      ],
       club_join_request_status: ["pending", "approved", "rejected"],
       club_role: ["owner", "member", "admin"],
       invite_status: ["pending", "accepted", "revoked", "expired"],

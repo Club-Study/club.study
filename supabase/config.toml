@@ -148,6 +148,11 @@ max_indexes = 5
 # function verifies the user access token with Auth before doing any work.
 verify_jwt = false
 
+[functions.club-email-notifications]
+# This endpoint is called only by Supabase Cron. It authenticates every request
+# with a separate high-entropy secret before accessing service-role RPCs.
+verify_jwt = false
+
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used

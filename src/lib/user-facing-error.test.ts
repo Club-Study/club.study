@@ -30,6 +30,12 @@ describe("getUserFacingError", () => {
     ).toMatchObject({
       kind: "duplicate-personal-paper",
     });
+    expect(
+      getUserFacingError({ code: "23505" }, "club-email-subscription"),
+    ).toEqual({
+      kind: "conflict",
+      message: "Email updates are already enabled for this club.",
+    });
   });
 
   it("maps club application races to actionable messages", () => {

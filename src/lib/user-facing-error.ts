@@ -18,6 +18,7 @@ export type UserFacingErrorOperation =
   | "invite"
   | "club-application"
   | "club-application-review"
+  | "club-email-subscription"
   | "member-management"
   | "schedule-paper"
   | "add-personal-paper"
@@ -174,6 +175,13 @@ function conflictForOperation(
     return {
       kind: "conflict",
       message: "This application has already been reviewed.",
+    };
+  }
+
+  if (operation === "club-email-subscription") {
+    return {
+      kind: "conflict",
+      message: "Email updates are already enabled for this club.",
     };
   }
 

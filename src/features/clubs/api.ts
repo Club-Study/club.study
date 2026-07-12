@@ -5,6 +5,8 @@ import type { Database } from "@/lib/supabase/database.types";
 export type Club = Database["public"]["Tables"]["clubs"]["Row"];
 export type ClubMember = Database["public"]["Tables"]["club_members"]["Row"];
 export type ClubInvite = Database["public"]["Tables"]["club_invites"]["Row"];
+export type ClubEmailSubscription =
+  Database["public"]["Tables"]["club_email_subscriptions"]["Row"];
 export type ClubRole = Database["public"]["Enums"]["club_role"];
 export type ClubJoinRequest =
   Database["public"]["Tables"]["club_join_requests"]["Row"];
@@ -216,6 +218,74 @@ export async function getClub(clubId: string) {
   }
 
   return data;
+}
+
+export async function getClubEmailSubscription(
+  clubId: string,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("club_email_subscriptions")
+    .select("club_id, user_id")
+    .eq("club_id", clubId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeClubEmailSubscription(data, { clubId, userId });
+}
+
+export async function setClubEmailSubscription(values: {
+  clubId: string;
+  userId: string;
+  enabled: boolean;
+}) {
+  if (values.enabled) {
+    const { data, error } = await supabase
+      .from("club_email_subscriptions")
+      .insert({
+        club_id: values.clubId,
+        user_id: values.userId,
+      })
+      .select("club_id, user_id")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return normalizeClubEmailSubscription(data, values);
+  }
+
+  const { error } = await supabase
+    .from("club_email_subscriptions")
+    .delete()
+    .eq("club_id", values.clubId)
+    .eq("user_id", values.userId);
+
+  if (error) {
+    throw error;
+  }
+
+  return false;
+}
+
+export function normalizeClubEmailSubscription(
+  row: Pick<ClubEmailSubscription, "club_id" | "user_id"> | null,
+  expected: { clubId: string; userId: string },
+) {
+  if (!row) {
+    return false;
+  }
+
+  if (row.club_id !== expected.clubId || row.user_id !== expected.userId) {
+    throw new Error("Club email subscription query returned an unexpected row.");
+  }
+
+  return true;
 }
 
 export async function createClub(values: {
